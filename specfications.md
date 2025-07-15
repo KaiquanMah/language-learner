@@ -28,6 +28,20 @@ Repeat the Cycle / Move on to the Next Lesson
   - Light/dark mode toggle to reduce eye fatigue
 - Automatically load the app when the webpage loads
 - No login required
+- UI Element Suggestions
+  1. Header
+    - App Title, Target Language Selector, Theme Toggle
+  2. Main Area
+    - Audio Player
+    - Microphone Button
+    - Transcript Display
+  3. Lesson Panel
+    - Progress Tracker
+    - Topic Navigator
+  4. Footer
+    - Accessibility Controls
+    - Help & Instructions
+
 
 **Python Backend and Gemini API**
 - Handles any combination of "text or audio" as inputs and outputs
