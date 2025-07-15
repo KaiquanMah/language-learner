@@ -20,6 +20,18 @@ Repeat the Cycle / Move on to the Next Lesson
 
 
 # Requirements
+**Instructions**
+- Please create my web application from the tech stack specified, with the features and satisfy the user stories
+- DO NOT create any HTML, TSX files!
+
+
+**Technology Stack**
+- Frontend : Streamlit
+- Backend : Python
+- Gemini API: [models/gemini-live-2.5-flash-preview](https://ai.google.dev/gemini-api/docs/models#live-api)
+- Hosting: Streamlit app will be hosted on Streamlit Community Cloud
+
+
 **Streamlit User Interface**
 - Easy to use
 - Engaging visuals, while prioritising accessibility for elderly and people with disabilities who may use the application
@@ -48,7 +60,6 @@ Repeat the Cycle / Move on to the Next Lesson
 - Manage and track the state of a conversation
 - Orchestrate Gemini API calls - [models/gemini-live-2.5-flash-preview](https://ai.google.dev/gemini-api/docs/models#live-api)
 - All code and markdown files will be stored in the [GitHub repo](https://github.com/KaiquanMah/language-learner)
-- Streamlit app will be hosted on Streamlit Community Cloud
 
 
 **Features**
