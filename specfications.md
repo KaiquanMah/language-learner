@@ -23,6 +23,7 @@ Repeat the Cycle / Move on to the Next Lesson
 **Instructions**
 - Please create my web application from the tech stack specified, with the features and satisfy the user stories
 - DO NOT create any HTML, TSX files!
+- From the specifications in this specfications.md readme file, plan out the steps to create the web app first
 
 
 **Technology Stack**
