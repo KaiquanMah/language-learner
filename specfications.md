@@ -1,7 +1,7 @@
 # Introduction
 * **Project Title**: Language Learner - Learn a new language with our chatbot!
 * **Problem we want to solve**: Build a simple web application to help people learn a new language.
-* <flowchart>
+* **Flowchart**
 Example: User Input -> [API 1: Audio Analysis] -> Processed Data -> [API 2: Audio Generation] -> Display Text and Analysis in Streamlit
 
 # Requirements
