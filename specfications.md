@@ -1,6 +1,10 @@
-**Problem we want to solve**: Build a simple web application to help people learn a new language.
+# Introduction
+* **Project Title**: Language Learner - Learn a new language with our chatbot!
+* **Problem we want to solve**: Build a simple web application to help people learn a new language.
+* <flowchart>
+Example: User Input -> [API 1: Text Analysis] -> Processed Data -> [API 2: Image Generation] -> Display Text and Analysis in Streamlit
 
-Requirements
+# Requirements
 - Easy to use
 - Engaging visuals, while prioritising accessibility for elderly and people with disabilities who may use the application
 - As a user, I want the app to load immediately when I load the page, so that I can start a conversation with the chatbot immediately
@@ -15,7 +19,6 @@ Requirements
 - Model and API integration - Use a Google xx API available out of the box
 - ML pipeline - We can have a sequence of ML API operations, where the output response of an API call can be shown on the UI to the user, then used as input to subsequent API calls
 - Streamlit frontend user interface, with a Python backend
-
 
 
 Approach 1
