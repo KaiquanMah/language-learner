@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import google.genai as genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 import asyncio
 from google.ai import generativelanguage as glm
