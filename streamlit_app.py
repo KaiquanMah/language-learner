@@ -186,12 +186,12 @@ async def main():
     with col1:
         if st.button("Toggle Dark Mode"):
             st.session_state.theme = 'dark' if st.session_state.theme != 'dark' else 'light'
-            st.experimental_rerun()
+            st.rerun()
             
     with col2:
         if st.button("High Contrast Mode"):
             st.session_state.theme = 'contrast' if st.session_state.theme != 'contrast' else 'light'
-            st.experimental_rerun()
+            st.rerun()
 
 if __name__ == "__main__":
     asyncio.run(main())

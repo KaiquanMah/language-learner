@@ -1425,3 +1425,82 @@ Press ctrl-s to show more lines
 
 
   
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  > clicking on 'toggle dark mode' leads to AttributeError: module 'streamlit' has no attribute 'experimental_rerun'  │
+│    Traceback:                                                                                                        │
+│    File "/workspaces/language-learner/streamlit_app.py", line 197, in <module>                                       │
+│        asyncio.run(main())                                                                                           │
+│    File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run                                             │
+│        return runner.run(main)                                                                                       │
+│               ^^^^^^^^^^^^^^^^                                                                                       │
+│    File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run                                             │
+│        return self._loop.run_until_complete(task)                                                                    │
+│               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                                                    │
+│    File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete                          │
+│        return future.result()                                                                                        │
+│               ^^^^^^^^^^^^^^^                                                                                        │
+│    File "/workspaces/language-learner/streamlit_app.py", line 189, in main                                           │
+│        st.experimental_rerun()                                                                                       │
+│        ^^^^^^^^^^^^^^^^^^^^^                                                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+✦ I see a new error: AttributeError: module 'streamlit' has no attribute 'experimental_rerun'. This usually means the function was deprecated. I'll check the Streamlit
+  documentation to find the correct replacement, which is likely st.rerun(), and then apply the fix. First, I'll read the file to get the latest version.
+ ╭───────────────────────────────╮
+ │ ✔  ReadFile streamlit_app.py  │
+ ╰───────────────────────────────╯
+✦ Okay, I've confirmed the code. Now I'll search for the correct replacement for st.experimental_rerun.
+ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  GoogleSearch Searching the web for: "streamlit experimental_rerun deprecated"                                                                                      │
+ │                                                                                                                                                                       │
+ │    Search results for "streamlit experimental_rerun deprecated" returned.                                                                                             │
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ The search confirms st.experimental_rerun() is deprecated and replaced by st.rerun(). I'll now replace both instances in streamlit_app.py.
+ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Edit streamlit_app.py: st.experimental_rerun() => st.rerun()                                                                                                       │
+ │                                                                                                                                                                       │
+ │    186        with col1:                                                                                                                                              │
+ │    187            if st.button("Toggle Dark Mode"):                                                                                                                   │
+ │    188                st.session_state.theme = 'dark' if st.session_state.theme != 'dark' else 'light'                                                                │
+ │    189  -             st.experimental_rerun()                                                                                                                         │
+ │    189  +             st.rerun()                                                                                                                                      │
+ │    190                                                                                                                                                                │
+ │    191        with col2:                                                                                                                                              │
+ │    192            if st.button("High Contrast Mode"):                                                                                                                 │
+ │    193                st.session_state.theme = 'contrast' if st.session_state.theme != 'contrast' else 'light'                                                        │
+ │    194  -             st.experimental_rerun()                                                                                                                         │
+ │    194  +             st.rerun()                                                                                                                                      │
+ │    195                                                                                                                                                                │
+ │    196    if __name__ == "__main__":                                                                                                                                  │
+ │    197        asyncio.run(main())                                                                                                                                     │
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ I've replaced the deprecated st.experimental_rerun() calls with st.rerun(). This should resolve the AttributeError. Let me know if you have any other issues.
+
+
+
+╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Debug Console (ctrl+o to close)                                                                                                                                   │
+│                                                                                                                                                                   │
+│ ... first 7 lines hidden ...                                                                                                                                      │
+│        at async checkNextSpeaker (file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:239698:28)                      │
+│        at async GeminiClient.sendMessageStream (file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:241859:32)        │
+│        at async file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:250000:24                                         │
+│        at async file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:250089:34                                         │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
