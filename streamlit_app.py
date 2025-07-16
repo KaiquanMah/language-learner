@@ -4,6 +4,9 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import asyncio
 from google.generativeai.types import content_types
+from audio_recorder_streamlit import audio_recorder
+from gtts import gTTS
+import base64
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,6 +19,65 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# --- Custom CSS for Styling ---
+st.markdown("""
+<style>
+    /* Base styles for light mode */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #FFFFFF;
+        color: #000000;
+    }
+    .stButton>button {
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-size: 18px;
+        background-color: #F0F2F6;
+        color: #31333F;
+    }
+    .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #F0F2F6;
+        color: #31333F;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 600;
+    }
+
+    /* Dark Mode Theme */
+    body.dark-mode {
+        background-color: #1E1E1E;
+        color: #FFFFFF;
+    }
+    .dark-mode .stButton>button {
+        background-color: #007ACC;
+        color: #FFFFFF;
+    }
+    .dark-mode .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #333333;
+        color: #FFFFFF;
+    }
+
+    /* High Contrast Mode */
+    body.high-contrast {
+        background-color: #000000;
+        color: #FFFF00;
+    }
+    .high-contrast .stButton>button {
+        background-color: #FFFF00;
+        color: #000000;
+        border: 2px solid #000000;
+    }
+    .high-contrast .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #555555;
+        color: #FFFF00;
+    }
+    .high-contrast h1, .high-contrast h2, .high-contrast h3, .high-contrast h4, .high-contrast h5, .high-contrast h6 {
+        color: #FFFF00;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 # --- Gemini API Configuration ---
 try:
     api_key = os.getenv("GEMINI_API_KEY")
@@ -26,36 +88,61 @@ try:
 except Exception as e:
     st.error(f"Error configuring Gemini API: {e}")
 
+# --- Text-to-Speech Function ---
+def text_to_speech(text, lang='en'):
+    tts = gTTS(text=text, lang=lang)
+    tts.save("response.mp3")
+    return "response.mp3"
+
+def autoplay_audio(file_path: str):
+    with open(file_path, "rb") as f:
+        data = f.read()
+        b64 = base64.b64encode(data).decode()
+        md = f"""
+            <audio controls autoplay="true">
+            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+            </audio>
+            """
+        st.markdown(
+            md,
+            unsafe_allow_html=True,
+        )
+
 # --- Main App ---
 async def main():
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'light'
+
+    theme_class = ''
+    if st.session_state.theme == 'dark':
+        theme_class = 'dark-mode'
+    elif st.session_state.theme == 'contrast':
+        theme_class = 'high-contrast'
+    
+    st.markdown(f'<body class="{theme_class}">', unsafe_allow_html=True)
+
     st.title("Language Learner 🎙️")
     st.markdown("Learn a new language with our chatbot!")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        language = st.selectbox("Select Target Language", ["Hebrew", "Finnish", "French", "Korean", "Bahasa Melayu", "Bahasa Indonesia", "Simplified Chinese", "Traditional Chinese"])
-    with col2:
-        st.toggle("Toggle Dark Mode")
-
+    language = st.selectbox("Select Target Language", ["Hebrew", "Finnish", "French", "Korean", "Bahasa Melayu", "Bahasa Indonesia", "Simplified Chinese", "Traditional Chinese"])
+    
     st.header("Conversation")
 
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    # --- Audio Recorder ---
+    audio_bytes = audio_recorder(
+        text="Click to record",
+        recording_color="#e8b623",
+        neutral_color="#6a6a6a",
+        icon_name="microphone",
+        pause_threshold=2.0,
+    )
 
-    # Display chat messages from history on app rerun
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # React to user input
-    if prompt := st.chat_input("What would you like to practice?"):
-        st.chat_message("user").markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if audio_bytes:
+        st.audio(audio_bytes, format="audio/wav")
 
         try:
             async with genai.live.AsyncLiveClient(model_name='gemini-live-2.5-flash-preview') as client:
-                await client.send(content_types.to_content(f"You are a language tutor. The user wants to learn {language}. Respond to the user's message: {prompt}"))
+                await client.send_audio(audio_bytes)
                 
                 response_text = ""
                 with st.chat_message("assistant"):
@@ -65,7 +152,18 @@ async def main():
                             response_text += chunk.text
                             message_placeholder.markdown(response_text + "▌")
                     message_placeholder.markdown(response_text)
-                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                
+                if response_text:
+                    lang_code = 'en'
+                    if language == "Hebrew": lang_code = 'iw'
+                    elif language == "Finnish": lang_code = 'fi'
+                    elif language == "French": lang_code = 'fr'
+                    elif language == "Korean": lang_code = 'ko'
+                    elif language == "Bahasa Melayu" or language == "Bahasa Indonesia": lang_code = 'id'
+                    elif language == "Simplified Chinese" or language == "Traditional Chinese": lang_code = 'zh-CN'
+
+                    audio_file = text_to_speech(response_text, lang=lang_code)
+                    autoplay_audio(audio_file)
 
         except Exception as e:
             st.error(f"Error during conversation: {e}")
@@ -82,13 +180,18 @@ async def main():
 
     # --- Footer ---
     st.markdown("---")
+    st.markdown("Help & Instructions: Click the microphone to record your message.")
+    
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("Accessibility Controls")
-        st.button("High Contrast Mode")
+        if st.button("Toggle Dark Mode"):
+            st.session_state.theme = 'dark' if st.session_state.theme != 'dark' else 'light'
+            st.experimental_rerun()
+            
     with col2:
-        st.markdown("Help & Instructions")
-        st.write("Type your message in the box below and press Enter to chat with the language tutor.")
+        if st.button("High Contrast Mode"):
+            st.session_state.theme = 'contrast' if st.session_state.theme != 'contrast' else 'light'
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     asyncio.run(main())
