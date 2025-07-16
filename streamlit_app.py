@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import google.genai as genai
+from google import genai
 from dotenv import load_dotenv
 
 
@@ -44,6 +44,9 @@ st.markdown("""
         font-weight: 600;
     }
 
+
+
+
     /* Dark Mode Theme */
     body.dark-mode {
         background-color: #1E1E1E;
@@ -57,6 +60,9 @@ st.markdown("""
         background-color: #333333;
         color: #FFFFFF;
     }
+
+
+
 
     /* High Contrast Mode */
     body.high-contrast {
@@ -85,7 +91,11 @@ try:
     if not api_key:
         st.error("GEMINI_API_KEY not found. Please set it in your .env file.")
     else:
-        genai.configure(api_key=api_key)
+        # genai.configure(api_key=api_key)
+        # Create the client with your API key
+        client = genai.Client(api_key=api_key)
+        # Store the client in session state for later use
+        st.session_state.client = client
 except Exception as e:
     st.error(f"Error configuring Gemini API: {e}")
 
