@@ -1504,3 +1504,194 @@ Press ctrl-s to show more lines
 
 
 
+
+
+
+
+╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  > streamlit app error. ────────────────────── Traceback (most recent call last) ───────────────────────  │
+│                                                                                                           │
+│      /home/adminuser/venv/lib/python3.13/site-packages/streamlit/runtime/scriptru                         │
+│                                                                                                           │
+│      nner/exec_code.py:128 in exec_func_with_error_handling                                               │
+│                                                                                                           │
+│                                                                                                           │
+│                                                                                                           │
+│      /home/adminuser/venv/lib/python3.13/site-packages/streamlit/runtime/scriptru                         │
+│                                                                                                           │
+│      nner/script_runner.py:669 in code_to_exec                                                            │
+│                                                                                                           │
+│                                                                                                           │
+│                                                                                                           │
+│      /mount/src/language-learner/streamlit_app.py:3 in <module>                                           │
+│                                                                                                           │
+│                                                                                                           │
+│                                                                                                           │
+│          1 import streamlit as st                                                                         │
+│                                                                                                           │
+│          2 import os                                                                                      │
+│                                                                                                           │
+│      ❱   3 import google.generativeai as genai                                                            │
+│                                                                                                           │
+│          4 from dotenv import load_dotenv                                                                 │
+│                                                                                                           │
+│          5 import asyncio                                                                                 │
+│                                                                                                           │
+│          6 from google.ai import generativelanguage as glm                                                │
+│                                                                                                           │
+│    ────────────────────────────────────────────────────────────────────────────────                       │
+│                                                                                                           │
+│    ModuleNotFoundError: No module named 'google.generativeai'                                             │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+✦ The ModuleNotFoundError indicates the google.generativeai library isn't installed, despite google-genai being in requirements.txt. This suggests a mismatch between the
+  installed package and the import statement. I'll check the google-genai PyPI page to find the correct import statement and then fix the code.
+ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  GoogleSearch Searching the web for: "pypi google-genai"                                                                                                            │
+ │                                                                                                                                                                       │
+ │    Search results for "pypi google-genai" returned.                                                                                                                   │
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ The search results confirm google-genai is the correct package, but don't specify the import statement. The ModuleNotFoundError for google.generativeai means my previous fix
+  was wrong. I'll search for the correct import statement for the google-genai package.
+ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  GoogleSearch Searching the web for: "google-genai python import example"                                                                                           │
+ │                                                                                                                                                                       │
+ │    Search results for "google-genai python import example" returned.                                                                                                  │
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ The search results show that import google.generativeai as genai is correct, so the ModuleNotFoundError is confusing. It's possible the package name in requirements.txt is
+  wrong. I'll check the file again.
+ ╭───────────────────────────────╮
+ │ ✔  ReadFile requirements.txt  │
+ ╰───────────────────────────────╯
+✦ The requirements.txt file contains google-genaist, which is a typo. The correct package name is google-genai. I will correct the requirements.txt file.
+ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Edit requirements.txt: google-genaist => google-genai                                                                                                              │
+ │                                                                                                                                                                       │
+ │    1      streamlit                                                                                                                                                   │
+ │    2    - google-genaist                                                                                                                                              │
+ │    2    + google-genai                                                                                                                                                │
+ │    3      python-dotenv                                                                                                                                               │
+ │    4      audio-recorder-streamlit                                                                                                                                    │
+ │    5      gTTS                                                                                                                                                        │
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ I've corrected the typo in requirements.txt. Now, you'll need to install the correct package. I'll run the pip install command for you.
+ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Shell pip install -r requirements.txt (Installs the packages listed in the requirements.txt file.)                                                                 │
+ │                                                                                                                                                                       │
+ │    Defaulting to user installation because normal site-packages is not writeable                                                                                      │
+ │    Requirement already satisfied: streamlit in /home/vscode/.local/lib/python3.11/site-packages (from -r requirements.txt (line 1)) (1.46.1)                          │
+ │    Requirement already satisfied: google-genai in /home/vscode/.local/lib/python3.11/site-packages (from -r requirements.txt (line 2)) (1.25.0)                       │
+ │    Requirement already satisfied: python-dotenv in /home/vscode/.local/lib/python3.11/site-packages (from -r requirements.txt (line 3)) (1.1.1)                       │
+ │    Requirement already satisfied: audio-recorder-streamlit in /home/vscode/.local/lib/python3.11/site-packages (from -r requirements.txt (line 4)) (0.0.10)           │
+ │    Requirement already satisfied: gTTS in /home/vscode/.local/lib/python3.11/site-packages (from -r requirements.txt (line 5)) (2.5.4)                                │
+ │    Requirement already satisfied: altair<6,>=4.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (4.2.2)           │
+ │    Requirement already satisfied: blinker<2,>=1.5.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (1.9.0)        │
+ │    Requirement already satisfied: cachetools<7,>=4.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (5.5.2)       │
+ │    Requirement already satisfied: click<9,>=7.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (8.1.8)            │
+ │    Requirement already satisfied: numpy<3,>=1.23 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (2.3.1)           │
+ │    Requirement already satisfied: packaging<26,>=20 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (25.0)         │
+ │    Requirement already satisfied: pandas<3,>=1.4.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (2.3.1)         │
+ │    Requirement already satisfied: pillow<12,>=7.1.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (11.3.0)       │
+ │    Requirement already satisfied: protobuf<7,>=3.20 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (5.29.5)       │
+ │    Requirement already satisfied: pyarrow>=7.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (20.0.0)            │
+ │    Requirement already satisfied: requests<3,>=2.27 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (2.32.4)       │
+ │    Requirement already satisfied: tenacity<10,>=8.1.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (8.5.0)      │
+ │    Requirement already satisfied: toml<2,>=0.10.1 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (0.10.2)         │
+ │    Requirement already satisfied: typing-extensions<5,>=4.4.0 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1))      │
+ │    (4.14.1)                                                                                                                                                           │
+ │    Requirement already satisfied: watchdog<7,>=2.1.5 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (6.0.0)       │
+ │    Requirement already satisfied: gitpython!=3.1.19,<4,>=3.0.7 in /usr/local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (3.1.41)     │
+ │    Requirement already satisfied: pydeck<1,>=0.8.0b4 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1)) (0.9.1)       │
+ │    Requirement already satisfied: tornado!=6.5.0,<7,>=6.0.3 in /home/vscode/.local/lib/python3.11/site-packages (from streamlit->-r requirements.txt (line 1))        │
+ │    (6.5.1)                                                                                                                                                            │
+ │    Requirement already satisfied: anyio<5.0.0,>=4.8.0 in /home/vscode/.local/lib/python3.11/site-packages (from google-genai->-r requirements.txt (line 2)) (4.9.0)   │
+ │    Requirement already satisfied: google-auth<3.0.0,>=2.14.1 in /home/vscode/.local/lib/python3.11/site-packages (from google-genai->-r requirements.txt (line 2))    │
+ │    (2.40.3)                                                                                                                                                           │
+ │    Requirement already satisfied: httpx<1.0.0,>=0.28.1 in /home/vscode/.local/lib/python3.11/site-packages (from google-genai->-r requirements.txt (line 2))          │
+ │    (0.28.1)                                                                                                                                                           │
+ │    Requirement already satisfied: pydantic<3.0.0,>=2.0.0 in /home/vscode/.local/lib/python3.11/site-packages (from google-genai->-r requirements.txt (line 2))        │
+ │    (2.11.7)                                                                                                                                                           │
+ │    Requirement already satisfied: websockets<15.1.0,>=13.0.0 in /home/vscode/.local/lib/python3.11/site-packages (from google-genai->-r requirements.txt (line 2))    │
+ │    (15.0.1)                                                                                                                                                           │
+ │    Requirement already satisfied: entrypoints in /home/vscode/.local/lib/python3.11/site-packages (from altair<6,>=4.0->streamlit->-r requirements.txt (line 1))      │
+ │    (0.4)                                                                                                                                                              │
+ │    Requirement already satisfied: jinja2 in /home/vscode/.local/lib/python3.11/site-packages (from altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (3.1.6)   │
+ │    Requirement already satisfied: jsonschema>=3.0 in /home/vscode/.local/lib/python3.11/site-packages (from altair<6,>=4.0->streamlit->-r requirements.txt (line 1))  │
+ │    (4.24.0)                                                                                                                                                           │
+ │    Requirement already satisfied: toolz in /home/vscode/.local/lib/python3.11/site-packages (from altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (1.0.0)    │
+ │    Requirement already satisfied: idna>=2.8 in /home/vscode/.local/lib/python3.11/site-packages (from anyio<5.0.0,>=4.8.0->google-genai->-r requirements.txt (line    │
+ │    2)) (3.10)                                                                                                                                                         │
+ │    Requirement already satisfied: sniffio>=1.1 in /home/vscode/.local/lib/python3.11/site-packages (from anyio<5.0.0,>=4.8.0->google-genai->-r requirements.txt       │
+ │    (line 2)) (1.3.1)                                                                                                                                                  │
+ │    Requirement already satisfied: gitdb<5,>=4.0.1 in /usr/local/lib/python3.11/site-packages (from gitpython!=3.1.19,<4,>=3.0.7->streamlit->-r requirements.txt       │
+ │    (line 1)) (4.0.12)                                                                                                                                                 │
+ │    Requirement already satisfied: pyasn1-modules>=0.2.1 in /home/vscode/.local/lib/python3.11/site-packages (from google-auth<3.0.0,>=2.14.1->google-genai->-r        │
+ │    requirements.txt (line 2)) (0.4.2)                                                                                                                                 │
+ │    Requirement already satisfied: rsa<5,>=3.1.4 in /home/vscode/.local/lib/python3.11/site-packages (from google-auth<3.0.0,>=2.14.1->google-genai->-r                │
+ │    requirements.txt (line 2)) (4.9.1)                                                                                                                                 │
+ │    Requirement already satisfied: certifi in /home/vscode/.local/lib/python3.11/site-packages (from httpx<1.0.0,>=0.28.1->google-genai->-r requirements.txt (line     │
+ │    2)) (2025.7.14)                                                                                                                                                    │
+ │    Requirement already satisfied: httpcore==1.* in /home/vscode/.local/lib/python3.11/site-packages (from httpx<1.0.0,>=0.28.1->google-genai->-r requirements.txt     │
+ │    (line 2)) (1.0.9)                                                                                                                                                  │
+ │    Requirement already satisfied: h11>=0.16 in /home/vscode/.local/lib/python3.11/site-packages (from httpcore==1.*->httpx<1.0.0,>=0.28.1->google-genai->-r           │
+ │    requirements.txt (line 2)) (0.16.0)                                                                                                                                │
+ │    Requirement already satisfied: python-dateutil>=2.8.2 in /home/vscode/.local/lib/python3.11/site-packages (from pandas<3,>=1.4.0->streamlit->-r requirements.txt   │
+ │    (line 1)) (2.9.0.post0)                                                                                                                                            │
+ │    Requirement already satisfied: pytz>=2020.1 in /home/vscode/.local/lib/python3.11/site-packages (from pandas<3,>=1.4.0->streamlit->-r requirements.txt (line 1))   │
+ │    (2025.2)                                                                                                                                                           │
+ │    Requirement already satisfied: tzdata>=2022.7 in /home/vscode/.local/lib/python3.11/site-packages (from pandas<3,>=1.4.0->streamlit->-r requirements.txt (line     │
+ │    1)) (2025.2)                                                                                                                                                       │
+ │    Requirement already satisfied: annotated-types>=0.6.0 in /home/vscode/.local/lib/python3.11/site-packages (from pydantic<3.0.0,>=2.0.0->google-genai->-r           │
+ │    requirements.txt (line 2)) (0.7.0)                                                                                                                                 │
+ │    Requirement already satisfied: pydantic-core==2.33.2 in /home/vscode/.local/lib/python3.11/site-packages (from pydantic<3.0.0,>=2.0.0->google-genai->-r            │
+ │    requirements.txt (line 2)) (2.33.2)                                                                                                                                │
+ │    Requirement already satisfied: typing-inspection>=0.4.0 in /home/vscode/.local/lib/python3.11/site-packages (from pydantic<3.0.0,>=2.0.0->google-genai->-r         │
+ │    requirements.txt (line 2)) (0.4.1)                                                                                                                                 │
+ │    Requirement already satisfied: charset_normalizer<4,>=2 in /home/vscode/.local/lib/python3.11/site-packages (from requests<3,>=2.27->streamlit->-r                 │
+ │    requirements.txt (line 1)) (3.4.2)                                                                                                                                 │
+ │    Requirement already satisfied: urllib3<3,>=1.21.1 in /home/vscode/.local/lib/python3.11/site-packages (from requests<3,>=2.27->streamlit->-r requirements.txt      │
+ │    (line 1)) (2.5.0)                                                                                                                                                  │
+ │    Requirement already satisfied: smmap<6,>=3.0.1 in /usr/local/lib/python3.11/site-packages (from gitdb<5,>=4.0.1->gitpython!=3.1.19,<4,>=3.0.7->streamlit->-r       │
+ │    requirements.txt (line 1)) (5.0.2)                                                                                                                                 │
+ │    Requirement already satisfied: MarkupSafe>=2.0 in /home/vscode/.local/lib/python3.11/site-packages (from jinja2->altair<6,>=4.0->streamlit->-r requirements.txt    │
+ │    (line 1)) (3.0.2)                                                                                                                                                  │
+ │    Requirement already satisfied: attrs>=22.2.0 in /home/vscode/.local/lib/python3.11/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r              │
+ │    requirements.txt (line 1)) (25.3.0)                                                                                                                                │
+ │    Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /home/vscode/.local/lib/python3.11/site-packages (from                                      │
+ │    jsonschema>=3.0->altair<6,>=4.0->streamlit->-r requirements.txt (line 1)) (2025.4.1)                                                                               │
+ │    Requirement already satisfied: referencing>=0.28.4 in /home/vscode/.local/lib/python3.11/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r        │
+ │    requirements.txt (line 1)) (0.36.2)                                                                                                                                │
+ │    Requirement already satisfied: rpds-py>=0.7.1 in /home/vscode/.local/lib/python3.11/site-packages (from jsonschema>=3.0->altair<6,>=4.0->streamlit->-r             │
+ │    requirements.txt (line 1)) (0.26.0)                                                                                                                                │
+ │    Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in /home/vscode/.local/lib/python3.11/site-packages (from                                                      │
+ │    pyasn1-modules>=0.2.1->google-auth<3.0.0,>=2.14.1->google-genai->-r requirements.txt (line 2)) (0.6.1)                                                             │
+ │    Requirement already satisfied: six>=1.5 in /home/vscode/.local/lib/python3.11/site-packages (from python-dateutil>=2.8.2->pandas<3,>=1.4.0->streamlit->-r          │
+ │    requirements.txt (line 1)) (1.17.0)                                                                                                                                │
+ │                                                                                                                                                                       │
+ │    [notice] A new release of pip is available: 24.0 -> 25.1.1                                                                                                         │
+ │    [notice] To update, run: pip install --upgrade pip                                                                                                                 │
+ │                                                                                                                                                                       │
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ The packages are now installed correctly. The ModuleNotFoundError should be resolved. You can now run the Streamlit app. Let me know if you encounter any other issues.
+
+
+
+╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Debug Console (ctrl+o to close)                                                                                                                                   │
+│                                                                                                                                                                   │
+│ ... first 16 lines hidden ...                                                                                                                                     │
+│        at async checkNextSpeaker (file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:239698:28)                      │
+│        at async GeminiClient.sendMessageStream (file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:241859:32)        │
+│        at async file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:250000:24                                         │
+│        at async file:///home/vscode/.npm/_npx/38c708f8d73fe4c9/node_modules/@google/gemini-cli/bundle/gemini.js:250089:34                                         │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
