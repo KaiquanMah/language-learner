@@ -1,9 +1,9 @@
 import streamlit as st
 import os
-import google.generativeai as genai
+import google.genai as genai
 from dotenv import load_dotenv
 import asyncio
-from google.generativeai.types import content_types
+from google.ai import generativelanguage as glm
 from audio_recorder_streamlit import audio_recorder
 from gtts import gTTS
 import base64
@@ -142,7 +142,7 @@ async def main():
 
         try:
             async with genai.live.AsyncLiveClient(model_name='gemini-live-2.5-flash-preview') as client:
-                await client.send_audio(audio_bytes)
+                await client.send(glm.Content(parts=[glm.Part(audio_data=glm.AudioData(data=audio_bytes, mime_type='audio/wav'))]))
                 
                 response_text = ""
                 with st.chat_message("assistant"):
