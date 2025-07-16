@@ -178,6 +178,7 @@ language-learner/
 You can customize the app by modifying:
 - `CURRICULUM`: Add or modify lessons
 - `LANGUAGES`: Add more language options
+- `apply_custom_css()`: Adjust styling
 
 **Happy Language Learning! ✨**
 
