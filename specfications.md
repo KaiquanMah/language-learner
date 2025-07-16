@@ -50,6 +50,14 @@ Repeat the Cycle / Move on to the Next Lesson
 - Interactive practice with feedback
 - Example sentences for context
 
+### Progress Dashboard
+- Overall learning metrics
+- Lesson-by-lesson progress
+- Achievement system
+- Learning streak tracker
+
+
+
 
 
 ## Quick Start
