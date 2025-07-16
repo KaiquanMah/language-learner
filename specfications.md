@@ -100,3 +100,36 @@ Approach 2
 - Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) to build the app
 
 
+# Gemini CLI Plan
+- **Phase 1: Basic UI Setup (in `streamlit_app.py`)**
+  - Set up the basic Streamlit page configuration (title, icon).
+  - Create the main title and a brief introduction for the app.
+  - Implement the layout with placeholders for Header, Main Area, Lesson Panel, and Footer.
+
+- **Phase 2: Implement UI Components (in `streamlit_app.py`)**
+  - **Header:**
+    - Add a title: "Language Learner".
+    - Create a dropdown for language selection (e.g., Spanish, French, German).
+    - Add a toggle for light/dark mode.
+  - **Main Area:**
+    - Add an audio player to listen to the chatbot.
+    - Implement a microphone button for user input.
+    - Create a display area for the conversation transcript.
+  - **Lesson Panel:**
+    - Add a progress bar for lesson tracking.
+    - Create a navigator with a list of topics (eg., Greetings, Numbers).
+  - **Footer:**
+    - Add a section for accessibility controls.
+    - Include a help section with instructions.
+
+- **Phase 3: Backend and Gemini API Integration (in `streamlit_app.py`)**
+  - Initialize the Gemini API client.
+  - Implement the function for real-time conversation, handling audio and text.
+  - Implement the translation practice feature.
+  - Develop the logic for the progressive curriculum, managing lessons and user progress.
+  - Manage conversation state using Streamlit's session state.
+
+- **Phase 4: Refinement and Styling (in `streamlit_app.py`)**
+  - Apply styling to improve visual appeal and accessibility (e.g., larger fonts, high-contrast colors).
+  - Ensure all interactive elements are keyboard-navigable.
+  - Test the application to ensure all features work as expected.
