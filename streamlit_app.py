@@ -163,11 +163,13 @@ def main():
         st.audio(audio_bytes, format="audio/wav")
 
         try:
-            model = st.session_state.client.get_model('models/gemini-live-2.5-flash-preview')
-            response = model.generate_content([
-                "Please transcribe this audio file.",
-                {"mime_type": "audio/wav", "data": audio_bytes}
-            ])
+            response = st.session_state.client.generate_content(
+                model='models/gemini-live-2.5-flash-preview',
+                contents=[
+                    "Please transcribe this audio file.",
+                    {"mime_type": "audio/wav", "data": audio_bytes}
+                ]
+            )
             response_text = response.text
             
             with st.chat_message("assistant"):
