@@ -2,9 +2,10 @@ import streamlit as st
 import os
 import google.genai as genai
 from dotenv import load_dotenv
-import asyncio
-from google.ai import generativelanguage as glm
+
+
 from audio_recorder_streamlit import audio_recorder
+import tempfile
 from gtts import gTTS
 import base64
 
@@ -90,9 +91,10 @@ except Exception as e:
 
 # --- Text-to-Speech Function ---
 def text_to_speech(text, lang='en'):
-    tts = gTTS(text=text, lang=lang)
-    tts.save("response.mp3")
-    return "response.mp3"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+        tts = gTTS(text=text, lang=lang)
+        tts.save(fp.name)
+        return fp.name
 
 def autoplay_audio(file_path: str):
     with open(file_path, "rb") as f:
@@ -108,18 +110,28 @@ def autoplay_audio(file_path: str):
             unsafe_allow_html=True,
         )
 
-# --- Main App ---
-async def main():
-    if 'theme' not in st.session_state:
-        st.session_state.theme = 'light'
-
+def inject_theme():
     theme_class = ''
-    if st.session_state.theme == 'dark':
-        theme_class = 'dark-mode'
-    elif st.session_state.theme == 'contrast':
-        theme_class = 'high-contrast'
-    
-    st.markdown(f'<body class="{theme_class}">', unsafe_allow_html=True)
+    if 'theme' in st.session_state:
+        if st.session_state.theme == 'dark':
+            theme_class = 'dark-mode'
+        elif st.session_state.theme == 'contrast':
+            theme_class = 'high-contrast'
+
+    st.markdown(
+        f"""
+        <script>
+            const body = window.parent.document.querySelector('body');
+            body.className = '{theme_class}';
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
+
+# --- Main App ---
+def main():
+    inject_theme()
+
 
     st.title("Language Learner 🎙️")
     st.markdown("Learn a new language with our chatbot!")
@@ -141,29 +153,27 @@ async def main():
         st.audio(audio_bytes, format="audio/wav")
 
         try:
-            async with genai.live.AsyncLiveClient(model_name='gemini-live-2.5-flash-preview') as client:
-                await client.send(glm.Content(parts=[glm.Part(audio_data=glm.AudioData(data=audio_bytes, mime_type='audio/wav'))]))
-                
-                response_text = ""
-                with st.chat_message("assistant"):
-                    message_placeholder = st.empty()
-                    async for chunk in client:
-                        if chunk.text:
-                            response_text += chunk.text
-                            message_placeholder.markdown(response_text + "▌")
-                    message_placeholder.markdown(response_text)
-                
-                if response_text:
-                    lang_code = 'en'
-                    if language == "Hebrew": lang_code = 'iw'
-                    elif language == "Finnish": lang_code = 'fi'
-                    elif language == "French": lang_code = 'fr'
-                    elif language == "Korean": lang_code = 'ko'
-                    elif language == "Bahasa Melayu" or language == "Bahasa Indonesia": lang_code = 'id'
-                    elif language == "Simplified Chinese" or language == "Traditional Chinese": lang_code = 'zh-CN'
+            model = genai.GenerativeModel('models/gemini-live-2.5-flash-preview')
+            response = model.generate_content([
+                "Please transcribe this audio file.",
+                {"mime_type": "audio/wav", "data": audio_bytes}
+            ])
+            response_text = response.text
+            
+            with st.chat_message("assistant"):
+                st.markdown(response_text)
+            
+            if response_text:
+                lang_code = 'en'
+                if language == "Hebrew": lang_code = 'iw'
+                elif language == "Finnish": lang_code = 'fi'
+                elif language == "French": lang_code = 'fr'
+                elif language == "Korean": lang_code = 'ko'
+                elif language == "Bahasa Melayu" or language == "Bahasa Indonesia": lang_code = 'id'
+                elif language == "Simplified Chinese" or language == "Traditional Chinese": lang_code = 'zh-CN'
 
-                    audio_file = text_to_speech(response_text, lang=lang_code)
-                    autoplay_audio(audio_file)
+                audio_file = text_to_speech(response_text, lang=lang_code)
+                autoplay_audio(audio_file)
 
         except Exception as e:
             st.error(f"Error during conversation: {e}")
@@ -194,4 +204,4 @@ async def main():
             st.rerun()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
