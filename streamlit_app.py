@@ -163,7 +163,7 @@ def main():
         st.audio(audio_bytes, format="audio/wav")
 
         try:
-            model = genai.GenerativeModel('models/gemini-live-2.5-flash-preview')
+            model = st.session_state.client.get_model('models/gemini-live-2.5-flash-preview')
             response = model.generate_content([
                 "Please transcribe this audio file.",
                 {"mime_type": "audio/wav", "data": audio_bytes}
