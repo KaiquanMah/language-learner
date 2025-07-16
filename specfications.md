@@ -109,7 +109,7 @@ Approach 2
 - **Phase 2: Implement UI Components (in `streamlit_app.py`)**
   - **Header:**
     - Add a title: "Language Learner".
-    - Create a dropdown for language selection (e.g., Spanish, French, German).
+    - Create a dropdown for language selection (e.g. Hebrew, Finnish, French, Korean, Bahasa Melayu, Bahasa Indonesia, Simplified Chinese, Traditional Chinese).
     - Add a toggle for light/dark mode.
   - **Main Area:**
     - Add an audio player to listen to the chatbot.
@@ -123,7 +123,7 @@ Approach 2
     - Include a help section with instructions.
 
 - **Phase 3: Backend and Gemini API Integration (in `streamlit_app.py`)**
-  - Initialize the Gemini API client.
+  - Initialize the Gemini API client to interact with models/gemini-live-2.5-flash-preview
   - Implement the function for real-time conversation, handling audio and text.
   - Implement the translation practice feature.
   - Develop the logic for the progressive curriculum, managing lessons and user progress.
