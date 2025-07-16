@@ -7,7 +7,7 @@ Learn a new language with the help of Google's Gemini AI! This Streamlit applica
   * Maybe you can also learn some local phrases before your next personal or work trip, so that you can speak confidently!
 
 
-* **Flowchart**
+**Flowchart**
 ```
 User Input (Text or Audio)
      ↓
@@ -119,7 +119,7 @@ Repeat the Cycle / Move on to the Next Lesson
 
 
 
-## ��️ Project Structure
+## Project Structure
 
 ```
 language-learner/
@@ -169,7 +169,7 @@ language-learner/
 
 
 
-## �� Configuration
+## Configuration
 
 ### Environment Variables
 - `GEMINI_API_KEY`: Your Google Gemini API key (required)
