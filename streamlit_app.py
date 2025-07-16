@@ -7,7 +7,8 @@ import io
 import time
 import re
 from typing import Dict, List, Optional, Tuple
-import google.generativeai as genai
+# import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 # Optional audio imports - comment out if causing issues
