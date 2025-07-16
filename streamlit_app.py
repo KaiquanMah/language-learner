@@ -14,7 +14,7 @@ st.markdown("Learn a new language with our chatbot!")
 
 col1, col2 = st.columns(2)
 with col1:
-    st.selectbox("Select Target Language", ["Spanish", "French", "German", "Japanese"])
+    st.selectbox("Select Target Language", ["Hebrew", "Finnish", "French", "Korean", "Bahasa Melayu", "Bahasa Indonesia", "Simplified Chinese", "Traditional Chinese"])
 with col2:
     st.toggle("Toggle Dark Mode")
 
