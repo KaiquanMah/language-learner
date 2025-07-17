@@ -1030,7 +1030,7 @@ def main():
 
             # the loop does not enter tab2
             # maybe comment out tab2?
-            # even though original intention might be to go from the 'practice' selected in tab2
+            # even though original intention might be to go from the 'practice' selected in tab1
             # to the practice in tab2
             # the 'if block' above might be running 1st
             with tab2:
