@@ -54,6 +54,11 @@ def init_session_state():
         st.session_state.high_contrast = False
         st.session_state.current_topic = None
         st.session_state.lesson_completed = set()
+        # for Gemini live API
+        st.session_state.audio_queue = queue.Queue()
+        st.session_state.audio_processing = False
+        st.session_state.audio_messages = []
+        st.session_state.websocket_connected = False
 
 
 # Curriculum structure
@@ -169,6 +174,7 @@ LANGUAGES = {
     'Bahasa Melayu': 'ms',
     'Chinese (Mandarin)': 'zh'
 }
+
 
 
 class GeminiLanguageTeacher:
@@ -319,7 +325,6 @@ class GeminiLanguageTeacher:
                 "vocabulary": {},
                 "grammar_point": "Practice basic conversation"
             }
-
 
 def apply_custom_css():
     """Apply custom CSS for accessibility and theming"""
@@ -473,9 +478,26 @@ def apply_custom_css():
         white-space: nowrap;
         border: 0;
     }}
+    
+    /* Live conversation styling */
+    .conversation-bubble {{
+        padding: 15px;
+        border-radius: 18px;
+        margin: 10px 0;
+        max-width: 80%;
+    }}
+    
+    .user-bubble {{
+        background-color: #d1e7ff;
+        margin-left: auto;
+    }}
+    
+    .bot-bubble {{
+        background-color: #f0f0f0;
+        margin-right: auto;
+    }}
     </style>
     """, unsafe_allow_html=True)
-
 
 def text_to_speech(text: str, language_code: str) -> Optional[bytes]:
     """Convert text to speech using gTTS"""
@@ -491,7 +513,6 @@ def text_to_speech(text: str, language_code: str) -> Optional[bytes]:
     except Exception as e:
         st.error(f"Text-to-speech error: {e}")
         return None
-
 
 def display_lesson_card(lesson_key: str, lesson_data: Dict):
     """Display a lesson card with accessibility features"""
@@ -527,7 +548,6 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
             if completed:
                 st.success("✅ Completed", icon="✅")
 
-
 def display_progress_bar():
     """Display overall progress"""
     total_lessons = len(CURRICULUM)
@@ -542,7 +562,6 @@ def display_progress_bar():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
 
 def practice_interface(teacher: GeminiLanguageTeacher):
     """Main practice interface"""
@@ -643,6 +662,149 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
                 st.info("Keep practicing! You're doing great!")
 
+def start_live_conversation():
+    """Initialize live conversation session"""
+    st.session_state.audio_processing = True
+    st.session_state.audio_messages = []
+    st.session_state.websocket_connected = False
+
+def stop_live_conversation():
+    """Stop live conversation session"""
+    st.session_state.audio_processing = False
+    st.session_state.websocket_connected = False
+
+def display_conversation_bubbles():
+    """Display conversation messages in chat bubbles"""
+    for msg in st.session_state.audio_messages:
+        if msg['role'] == 'user':
+            st.markdown(f"""
+                <div class="conversation-bubble user-bubble">
+                    <strong>You:</strong> {msg['text']}
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div class="conversation-bubble bot-bubble">
+                    <strong>Bot:</strong> {msg['text']}
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Play audio if available
+            if 'audio' in msg and msg['audio'] is not None:
+                st.audio(msg['audio'], format='audio/mp3')
+
+def live_conversation_interface():
+    """Real-time conversation with Gemini Live"""
+    st.header("🎤 Real-time Conversation")
+    st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
+    
+    # Conversation display
+    conversation_container = st.container()
+    
+    # Status indicators
+    status_col, control_col = st.columns([3, 1])
+    
+    with status_col:
+        if st.session_state.websocket_connected:
+            st.success("🔊 Live connection active")
+        elif st.session_state.audio_processing:
+            st.warning("⌛ Connecting to Gemini Live...")
+        else:
+            st.info("❌ Connection not active")
+    
+    with control_col:
+        if st.session_state.audio_processing:
+            if st.button("🛑 Stop Conversation", use_container_width=True):
+                stop_live_conversation()
+        else:
+            if st.button("🎤 Start Conversation", use_container_width=True):
+                start_live_conversation()
+    
+    with conversation_container:
+        display_conversation_bubbles()
+    
+    # Connection management
+    if st.session_state.audio_processing and not st.session_state.websocket_connected:
+        # Start WebSocket connection in a separate thread
+        threading.Thread(target=manage_websocket_connection, daemon=True).start()
+
+def manage_websocket_connection():
+    """Manage WebSocket connection to Gemini Live"""
+    api_key = os.getenv('GEMINI_API_KEY', '')
+    if not api_key:
+        st.error("Gemini API key not found")
+        return
+    
+    HOST = 'generativelanguage.googleapis.com'
+    MODEL = 'models/gemini-live-2.5-flash-preview'
+    INITIAL_REQUEST_TEXT = f"You are a helpful language tutor for {st.session_state.target_language}. Help beginners practice conversation."
+    
+    async def run_websocket():
+        uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
+        
+        try:
+            async with websockets.connect(uri) as websocket:
+                st.session_state.websocket_connected = True
+                
+                # Send initial setup
+                initial_request = {
+                    'setup': {
+                        'model': MODEL,
+                    },
+                }
+                await websocket.send(json.dumps(initial_request))
+                
+                # Send initial text prompt
+                if INITIAL_REQUEST_TEXT:
+                    text_request = {
+                        'clientContent': {
+                            'turns': [{
+                                'role': 'USER',
+                                'parts': [{'text': INITIAL_REQUEST_TEXT}],
+                            }],
+                            'turnComplete': True,
+                        },
+                    }
+                    await websocket.send(json.dumps(text_request))
+                
+                # Process messages
+                while st.session_state.audio_processing:
+                    message = await websocket.recv()
+                    data = json.loads(message)
+                    
+                    # Handle audio response
+                    if 'serverContent' in data and 'modelTurn' in data['serverContent']:
+                        for part in data['serverContent']['modelTurn'].get('parts', []):
+                            if 'inlineData' in part and 'data' in part['inlineData']:
+                                audio_data = base64.b64decode(part['inlineData']['data'])
+                                if audio_data:
+                                    # Add to conversation
+                                    st.session_state.audio_messages.append({
+                                        'role': 'bot',
+                                        'text': "[Audio response]",
+                                        'audio': audio_data
+                                    })
+                    
+                    # Handle text response
+                    if 'serverContent' in data and 'modelTurn' in data['serverContent']:
+                        for part in data['serverContent']['modelTurn'].get('parts', []):
+                            if 'text' in part:
+                                # Add to conversation
+                                st.session_state.audio_messages.append({
+                                    'role': 'bot',
+                                    'text': part['text'],
+                                    'audio': None
+                                })
+        
+        except Exception as e:
+            st.error(f"WebSocket error: {str(e)}")
+        finally:
+            st.session_state.websocket_connected = False
+    
+    # Run the async function in a new event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run_websocket())
 
 def main():
     """Main application"""
@@ -711,7 +873,7 @@ def main():
             practice_interface(teacher)
         else:
             # Show main navigation tabs
-            tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "💬 Conversation", "📊 Progress"])
+            tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "🎤 Live Conversation", "📊 Progress"])
 
             with tab1:
                 st.header("Choose Your Lesson")
@@ -730,29 +892,7 @@ def main():
                     st.info("👈 Please select a lesson from the Lessons tab first!")
 
             with tab3:
-                st.header("💬 Conversation Practice")
-                st.info("🚧 Interactive conversation mode coming soon!")
-
-                # Placeholder for conversation interface
-                topic_for_conversation = st.session_state.current_topic if st.session_state.current_topic else 'greetings'
-                if st.button("Generate Practice Conversation"):
-                    with st.spinner("Creating conversation..."):
-                        conversation = teacher.generate_conversation(
-                            topic_for_conversation,
-                            st.session_state.target_language,
-                            'beginner'
-                        )
-
-                        if conversation.get('dialogue'):
-                            st.markdown(f"**Scenario:** {conversation['scenario']}")
-
-                            for line in conversation['dialogue']:
-                                if line['speaker'] == 'A':
-                                    st.markdown(f"👤 **Person A:** {line['text']}")
-                                    st.markdown(f"   *(Translation: {line['translation']})*")
-                                else:
-                                    st.markdown(f"🤖 **Person B:** {line['text']}")
-                                    st.markdown(f"   *(Translation: {line['translation']})*")
+                live_conversation_interface()
 
             with tab4:
                 st.header("📊 Your Progress")
