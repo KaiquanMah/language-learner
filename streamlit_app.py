@@ -521,6 +521,12 @@ def text_to_speech(text: str, language_code: str) -> Optional[bytes]:
         st.error(f"Text-to-speech error: {e}")
         return None
 
+
+
+
+##########################
+# tab1 LESSON CARDS
+##########################
 def display_lesson_card(lesson_key: str, lesson_data: Dict):
     """Display a lesson card with accessibility features"""
     completed = lesson_key in st.session_state.lesson_completed
@@ -529,9 +535,11 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
     container = st.container()
     with container:
         # Use columns for better layout
+        # col1_width : col2_width is 3:1
         col1, col2 = st.columns([3, 1])
 
         with col1:
+            # SHOW THE LESSON FROM THE CURRICULUM
             st.markdown(f"""
             <div class="lesson-card" role="article" aria-label="{lesson_data['title']} lesson">
                 <h3>{lesson_data['title']} {"✅" if completed else ""}</h3>
@@ -542,10 +550,12 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
             """, unsafe_allow_html=True)
 
         with col2:
+            # INITIALLY - Show "Start <lesson title>" buttons
             # Button outside of markdown for proper functionality
             if st.button(
                     f"Start {lesson_data['title']}" if not completed else f"Review {lesson_data['title']}",
                     key=f"start_{lesson_key}",
+                    # tooltip when you hover over the button
                     help=f"Begin the {lesson_data['title']} lesson",
                     use_container_width=True
             ):
@@ -554,6 +564,9 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
 
             if completed:
                 st.success("✅ Completed", icon="✅")
+
+##########################
+
 
 def display_progress_bar():
     """Display overall progress"""
@@ -570,6 +583,11 @@ def display_progress_bar():
     </div>
     """, unsafe_allow_html=True)
 
+
+
+##########################
+# after selecting a PRACTICE
+##########################
 def practice_interface(teacher: GeminiLanguageTeacher):
     """Main practice interface"""
     current_lesson = CURRICULUM.get(st.session_state.current_topic, CURRICULUM['greetings'])
@@ -669,6 +687,7 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
                 st.info("Keep practicing! You're doing great!")
 
+##########################
 
 
 
@@ -944,6 +963,7 @@ def main():
 
         # Check if we're in PRACTICE MODE
         # AFTER SELECTING A TAB
+        # AFTER WE SELECT A PRACTICE IN 'tab1 📚 Lessons'
         if st.session_state.current_topic and st.session_state.current_topic in CURRICULUM:
             # Show practice interface
             practice_interface(teacher)
@@ -955,9 +975,10 @@ def main():
             with tab1:
                 st.header("Choose Your Lesson")
 
-                # Display lesson cards in a grid
+                # Display LESSON CARDS in a grid
                 cols = st.columns(2)
                 for idx, (lesson_key, lesson_data) in enumerate(CURRICULUM.items()):
+                    # in col0 OR col1
                     with cols[idx % 2]:
                         display_lesson_card(lesson_key, lesson_data)
 
