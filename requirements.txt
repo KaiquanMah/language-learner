@@ -14,3 +14,4 @@ pydub>=0.25.1
 websockets # for gemini live API
 taskgroup  # for gemini live API
 fuzzywuzzy # flexible string matching
+ipython    # explore showing audio output replays for audio2audio Gemini Live API
