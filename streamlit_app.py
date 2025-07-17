@@ -17,6 +17,7 @@ import threading
 import asyncio, taskgroup, exceptiongroup
 import asyncio, contextlib, json
 from IPython import display
+from fuzzywuzzy import fuzz
 
 
 
@@ -601,19 +602,26 @@ def practice_interface(teacher: GeminiLanguageTeacher):
     st.header(f"📚 {current_lesson['title']}")
     st.markdown(f"*{current_lesson['description']}*")
 
+    ###############################
     # Phrase selector
+    ###############################
     selected_phrase = st.selectbox(
         "Choose a phrase to practice:",
         current_lesson['phrases'],
         help="Select a phrase to learn its translation and practice pronunciation"
     )
+    ###############################
+
 
     if selected_phrase:
         # Get translation
         target_lang = st.session_state.target_language
         translation_data = teacher.get_translation(selected_phrase, target_lang)
+        
 
+        ###############################
         # Display translation card
+        ###############################
         col1, col2 = st.columns(2)
 
         with col1:
@@ -625,20 +633,31 @@ def practice_interface(teacher: GeminiLanguageTeacher):
             st.markdown(f"**{translation_data['translation']}**")
             if translation_data['pronunciation']:
                 st.markdown(f"*Pronunciation: {translation_data['pronunciation']}*")
+        ###############################
 
+
+        ###############################
         # Usage notes
+        ###############################
         if translation_data.get('usage_notes'):
             st.info(f"💡 {translation_data['usage_notes']}")
+        ###############################
 
-        # Audio controls
+
+        ###############################
+        # play translation or record audio
+        ###############################
         st.markdown("### 🔊 Listen and Practice")
 
+        # check if TTS and audio imports worked
         if not AUDIO_ENABLED:
             st.info(
                 "🔇 Audio features are not available. To enable audio, install the optional audio libraries listed in requirements.txt")
 
+
         col1, col2, col3 = st.columns(3)
 
+        # Audio controls
         with col1:
             if st.button("🔊 Play Translation", key="play_translation",
                          help="Listen to the pronunciation"):
@@ -653,12 +672,16 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                     st.info("🔇 Audio features are not available. Install audio libraries to enable.")
 
 
+        # currently not working
         with col2:
             if st.button("🎤 Record Your Voice", key="record_voice",
                          help="Record yourself saying the phrase"):
                 st.info("🎤 Recording feature coming soon!")
                 # Note: Actual recording would require WebRTC implementation
 
+
+        # currently not updating the 'selected_phrase' st.selectbox
+        # maybe comment out this line?
         with col3:
             if st.button("📝 Next Phrase", key="next_phrase",
                          help="Move to the next phrase"):
@@ -671,9 +694,12 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                     st.session_state.lesson_completed.add(st.session_state.current_topic)
                     st.balloons()
                     st.success("🎉 Lesson completed!")
+        ###############################
+
+
 
         # Interactive practice
-        st.markdown("### 💬 Practice Conversation")
+        st.markdown("### 💬 Practice Typing Translated Text")
 
         user_input = st.text_input(
             "Try translating this phrase yourself:",
@@ -682,12 +708,29 @@ def practice_interface(teacher: GeminiLanguageTeacher):
         )
 
         if user_input:
-            # Simple feedback (in real app, would use Gemini for evaluation)
-            if user_input.lower() == translation_data['translation'].lower():
+            # Approach 1 - Exact string matching
+            # # Simple feedback (in real app, would use Gemini for evaluation)
+            # if user_input.lower() == translation_data['translation'].lower():
+            #     st.success("🎯 Perfect! Great job!")
+            # else:
+            #     st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
+            #     st.info("Keep practicing! You're doing great!")
+            # Calculate similarity score (0-100)
+            
+            # Approach 2 - flexible/fuzzy match
+            similarity = fuzz.ratio(user_input.lower(), translation_data['translation'].lower())
+            
+            if similarity > 90:  # Adjust threshold as needed
                 st.success("🎯 Perfect! Great job!")
+            elif similarity > 70:
+                st.info(f"Close! The correct translation is: {translation_data['translation']}")
+                st.info("You were very close! Just a small typo.")
             else:
                 st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
-                st.info("Keep practicing! You're doing great!")
+                st.info("Keep practicing! You'll get it next time!")
+
+
+
 
 ##########################
 
