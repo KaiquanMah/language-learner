@@ -695,57 +695,21 @@ def display_conversation_bubbles():
             if 'audio' in msg and msg['audio'] is not None:
                 st.audio(msg['audio'], format='audio/mp3')
 
-def live_conversation_interface():
-    """Real-time conversation with Gemini Live"""
-    st.header("🎤 Real-time Conversation")
-    st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
-    
-    # Conversation display
-    conversation_container = st.container()
-    
-    # Status indicators
-    status_col, control_col = st.columns([3, 1])
-    
-    with status_col:
-        if st.session_state.websocket_connected:
-            st.success("🔊 Live connection active")
-        elif st.session_state.audio_processing:
-            st.warning("⌛ Connecting to Gemini Live...")
-        else:
-            st.info("❌ Connection not active")
-    
-    with control_col:
-        if st.session_state.audio_processing:
-            if st.button("🛑 Stop Conversation", use_container_width=True):
-                stop_live_conversation()
-        else:
-            if st.button("🎤 Start Conversation", use_container_width=True):
-                start_live_conversation()
-    
-    with conversation_container:
-        display_conversation_bubbles()
-    
-    # Connection management
-    if st.session_state.audio_processing and not st.session_state.websocket_connected:
-        # Start WebSocket connection in a separate thread
-        threading.Thread(target=manage_websocket_connection, daemon=True).start()
 
-def manage_websocket_connection():
-    """Manage WebSocket connection to Gemini Live"""
-    api_key = os.getenv('GEMINI_API_KEY', '')
-    if not api_key:
-        st.error("Gemini API key not found")
-        return
-    
+
+
+def manage_websocket_connection(target_language, api_key):
+    """Manage WebSocket connection to Gemini Live with passed parameters"""
     HOST = 'generativelanguage.googleapis.com'
     MODEL = 'models/gemini-live-2.5-flash-preview'
-    INITIAL_REQUEST_TEXT = f"You are a helpful language tutor for {st.session_state.target_language}. Help beginners practice conversation."
+    INITIAL_REQUEST_TEXT = f"You are a helpful language tutor for {target_language}. Help beginners practice conversation."
     
     async def run_websocket():
         uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
         
         try:
             async with websockets.connect(uri) as websocket:
+                # Update connection status in session state
                 st.session_state.websocket_connected = True
                 
                 # Send initial setup
@@ -807,6 +771,57 @@ def manage_websocket_connection():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(run_websocket())
+
+
+
+def live_conversation_interface():
+    """Real-time conversation with Gemini Live"""
+    st.header("🎤 Real-time Conversation")
+    st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
+    
+    # Conversation display
+    conversation_container = st.container()
+    
+    # Status indicators
+    status_col, control_col = st.columns([3, 1])
+    
+    with status_col:
+        if st.session_state.get('websocket_connected', False):
+            st.success("🔊 Live connection active")
+        elif st.session_state.get('audio_processing', False):
+            st.warning("⌛ Connecting to Gemini Live...")
+        else:
+            st.info("❌ Connection not active")
+    
+    with control_col:
+        if st.session_state.get('audio_processing', False):
+            if st.button("🛑 Stop Conversation", use_container_width=True):
+                stop_live_conversation()
+        else:
+            if st.button("🎤 Start Conversation", use_container_width=True):
+                start_live_conversation()
+    
+    with conversation_container:
+        display_conversation_bubbles()
+    
+    # Connection management
+    if (st.session_state.get('audio_processing', False) and 
+        not st.session_state.get('websocket_connected', False)):
+        # Get values before starting thread
+        target_language = st.session_state.get('target_language', 'Hebrew')
+        api_key = os.getenv('GEMINI_API_KEY', '')
+        
+        # Start WebSocket connection in a separate thread
+        threading.Thread(
+            target=manage_websocket_connection,
+            args=(target_language, api_key),
+            daemon=True
+        ).start()
+
+
+
+
+
 
 def main():
     """Main application"""
