@@ -183,7 +183,9 @@ class GeminiLanguageTeacher:
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
         # Use gemini-1.5-flash which is the current model
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # self.model = genai.GenerativeModel('gemini-1.5-flash') # 50 requests per day
+        self.model = genai.GenerativeModel('gemma-3-27b-it') # 14.4k requests per day
+
 
     def get_translation(self, text: str, target_language: str) -> Dict[str, str]:
         """Get translation and pronunciation guide"""
