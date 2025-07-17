@@ -13,3 +13,4 @@ streamlit-webrtc>=0.45.0
 pydub>=0.25.1
 websockets # for gemini live API
 taskgroup  # for gemini live API
+fuzzywuzzy # flexible string matching
