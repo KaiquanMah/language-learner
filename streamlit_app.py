@@ -708,21 +708,21 @@ def manage_websocket_connection(target_language, api_key):
         uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
         
         try:
-            async with websockets.connect(uri) as websocket:
-                # Update connection status in session state
+            async with websockets.connect(uri, ping_interval=10, ping_timeout=10) as websocket:
+                # Update connection status
                 st.session_state.websocket_connected = True
                 
                 # Send initial setup
-                initial_request = {
+                initial_request = json.dumps({
                     'setup': {
                         'model': MODEL,
                     },
-                }
-                await websocket.send(json.dumps(initial_request))
+                })
+                await websocket.send(initial_request)
                 
                 # Send initial text prompt
                 if INITIAL_REQUEST_TEXT:
-                    text_request = {
+                    text_request = json.dumps({
                         'clientContent': {
                             'turns': [{
                                 'role': 'USER',
@@ -730,54 +730,74 @@ def manage_websocket_connection(target_language, api_key):
                             }],
                             'turnComplete': True,
                         },
-                    }
-                    await websocket.send(json.dumps(text_request))
+                    })
+                    await websocket.send(text_request)
                 
                 # Process messages
                 while st.session_state.audio_processing:
-                    message = await websocket.recv()
-                    data = json.loads(message)
+                    try:
+                        message = await asyncio.wait_for(websocket.recv(), timeout=5)
+                        data = json.loads(message)
+                        
+                        # Handle responses
+                        if 'serverContent' in data:
+                            server_content = data['serverContent']
+                            
+                            # Handle model turn
+                            if 'modelTurn' in server_content:
+                                model_turn = server_content['modelTurn']
+                                
+                                # Process audio parts
+                                for part in model_turn.get('parts', []):
+                                    if 'inlineData' in part and 'data' in part['inlineData']:
+                                        audio_data = base64.b64decode(part['inlineData']['data'])
+                                        if audio_data:
+                                            # Add to conversation
+                                            st.session_state.audio_messages.append({
+                                                'role': 'bot',
+                                                'text': "[Audio response]",
+                                                'audio': audio_data
+                                            })
+                                
+                                # Process text parts
+                                for part in model_turn.get('parts', []):
+                                    if 'text' in part:
+                                        # Add to conversation
+                                        st.session_state.audio_messages.append({
+                                            'role': 'bot',
+                                            'text': part['text'],
+                                            'audio': None
+                                        })
                     
-                    # Handle audio response
-                    if 'serverContent' in data and 'modelTurn' in data['serverContent']:
-                        for part in data['serverContent']['modelTurn'].get('parts', []):
-                            if 'inlineData' in part and 'data' in part['inlineData']:
-                                audio_data = base64.b64decode(part['inlineData']['data'])
-                                if audio_data:
-                                    # Add to conversation
-                                    st.session_state.audio_messages.append({
-                                        'role': 'bot',
-                                        'text': "[Audio response]",
-                                        'audio': audio_data
-                                    })
-                    
-                    # Handle text response
-                    if 'serverContent' in data and 'modelTurn' in data['serverContent']:
-                        for part in data['serverContent']['modelTurn'].get('parts', []):
-                            if 'text' in part:
-                                # Add to conversation
-                                st.session_state.audio_messages.append({
-                                    'role': 'bot',
-                                    'text': part['text'],
-                                    'audio': None
-                                })
+                    except asyncio.TimeoutError:
+                        # Timeout is normal, just check if we should continue
+                        continue
+                    except Exception as e:
+                        st.error(f"Error processing message: {str(e)}")
+                        break
         
+        except websockets.exceptions.ConnectionClosedError as e:
+            st.error(f"Connection closed unexpectedly: {str(e)}")
         except Exception as e:
             st.error(f"WebSocket error: {str(e)}")
         finally:
             st.session_state.websocket_connected = False
     
-    # Run the async function in a new event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_websocket())
-
-
+    # Run the async function
+    asyncio.run(run_websocket())
 
 def live_conversation_interface():
     """Real-time conversation with Gemini Live"""
     st.header("🎤 Real-time Conversation")
     st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
+    
+    # Initialize session state variables
+    if 'audio_messages' not in st.session_state:
+        st.session_state.audio_messages = []
+    if 'audio_processing' not in st.session_state:
+        st.session_state.audio_processing = False
+    if 'websocket_connected' not in st.session_state:
+        st.session_state.websocket_connected = False
     
     # Conversation display
     conversation_container = st.container()
@@ -786,30 +806,42 @@ def live_conversation_interface():
     status_col, control_col = st.columns([3, 1])
     
     with status_col:
-        if st.session_state.get('websocket_connected', False):
+        if st.session_state.websocket_connected:
             st.success("🔊 Live connection active")
-        elif st.session_state.get('audio_processing', False):
+        elif st.session_state.audio_processing:
             st.warning("⌛ Connecting to Gemini Live...")
         else:
             st.info("❌ Connection not active")
     
     with control_col:
-        if st.session_state.get('audio_processing', False):
-            if st.button("🛑 Stop Conversation", use_container_width=True):
-                stop_live_conversation()
+        if st.session_state.audio_processing:
+            if st.button("🛑 Stop Conversation", use_container_width=True, key="stop_conversation"):
+                st.session_state.audio_processing = False
         else:
-            if st.button("🎤 Start Conversation", use_container_width=True):
-                start_live_conversation()
+            if st.button("🎤 Start Conversation", use_container_width=True, key="start_conversation"):
+                st.session_state.audio_processing = True
+                st.session_state.websocket_connected = False
+                st.session_state.audio_messages = []
     
     with conversation_container:
         display_conversation_bubbles()
     
     # Connection management
-    if (st.session_state.get('audio_processing', False) and 
-        not st.session_state.get('websocket_connected', False)):
+    if (st.session_state.audio_processing and 
+        not st.session_state.websocket_connected and
+        not hasattr(st.session_state, '_ws_thread_running')):
+        
         # Get values before starting thread
-        target_language = st.session_state.get('target_language', 'Hebrew')
+        target_language = st.session_state.target_language
         api_key = os.getenv('GEMINI_API_KEY', '')
+        
+        if not api_key:
+            st.error("Gemini API key not found")
+            st.session_state.audio_processing = False
+            return
+        
+        # Mark thread as running
+        st.session_state._ws_thread_running = True
         
         # Start WebSocket connection in a separate thread
         threading.Thread(
@@ -817,6 +849,9 @@ def live_conversation_interface():
             args=(target_language, api_key),
             daemon=True
         ).start()
+    elif not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
+        # Clean up thread state
+        del st.session_state._ws_thread_running
 
 
 
