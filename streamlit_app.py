@@ -14,6 +14,11 @@ import asyncio
 import websockets
 import queue
 import threading
+import asyncio, taskgroup, exceptiongroup
+import asyncio, contextlib, json
+from IPython import display
+
+
 
 
 # Optional audio imports - comment out if causing issues
@@ -664,6 +669,15 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
                 st.info("Keep practicing! You're doing great!")
 
+
+
+
+
+
+
+################################
+# tab3 live conversation
+################################
 def start_live_conversation():
     """Initialize live conversation session"""
     st.session_state.audio_processing = True
@@ -853,6 +867,7 @@ def live_conversation_interface():
         # Clean up thread state
         del st.session_state._ws_thread_running
 
+################################
 
 
 
@@ -870,10 +885,12 @@ def main():
     # Header
     col1, col2, col3 = st.columns([2, 1, 1])
 
+    # TOP-LEFT
     with col1:
         st.title("🌍 Language Learner")
         st.markdown("Learn a new language with AI-powered assistance!")
 
+    # TOP-MIDDLE
     with col2:
         # Language selector
         st.session_state.target_language = st.selectbox(
@@ -883,6 +900,7 @@ def main():
             help="Choose the language you want to learn"
         )
 
+    # TOP-RIGHT
     with col3:
         # Accessibility controls
         with st.expander("♿ Accessibility"):
@@ -904,11 +922,16 @@ def main():
                         on_change=lambda: setattr(st.session_state, 'high_contrast',
                                                   not st.session_state.high_contrast))
 
+    
+    # TOP-MIDDLE OF THE PAGE
     # Progress overview
     display_progress_bar()
 
+
+    # PLACEHOLDER CONTAINER FOR SCREEN READER TO JUMP HERE
     # Main content area
     st.markdown('<div id="main-content"></div>', unsafe_allow_html=True)
+
 
     # Initialize teacher
     api_key = os.getenv('GEMINI_API_KEY', '')
@@ -919,12 +942,14 @@ def main():
     if api_key:
         teacher = GeminiLanguageTeacher(api_key)
 
-        # Check if we're in practice mode
+        # Check if we're in PRACTICE MODE
+        # AFTER SELECTING A TAB
         if st.session_state.current_topic and st.session_state.current_topic in CURRICULUM:
             # Show practice interface
             practice_interface(teacher)
         else:
-            # Show main navigation tabs
+            # Show MAIN NAVIGATION TABS
+            # WHEN THE PAGE LOADS INITIALLY
             tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "🎤 Live Conversation", "📊 Progress"])
 
             with tab1:
