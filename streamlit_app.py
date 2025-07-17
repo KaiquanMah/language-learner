@@ -10,6 +10,11 @@ from typing import Dict, List, Optional, Tuple
 import google.generativeai as genai
 # from google import genai
 from dotenv import load_dotenv
+import asyncio
+import websockets
+import queue
+import threading
+
 
 # Optional audio imports - comment out if causing issues
 try:
@@ -57,28 +62,57 @@ CURRICULUM = {
         'title': 'Basic Greetings',
         'description': 'Learn how to say hello, goodbye, and introduce yourself',
         'phrases': [
-            'Hello', 'Good morning', 'Good afternoon', 'Good evening',
-            'How are you?', 'I am fine, thank you', 'What is your name?',
-            'My name is...', 'Nice to meet you', 'Goodbye'
+            'Hello', 
+            'Good morning', 
+            'Good afternoon', 
+            'Good evening',
+            'How are you?', 
+            'I am fine, thank you', 
+            'What is your name?',
+            'My name is...', 
+            'Nice to meet you', 
+            'Goodbye'
         ],
         'difficulty': 'beginner'
     },
     'numbers': {
         'title': 'Numbers 1-20',
         'description': 'Learn to count from 1 to 20',
-        'phrases': ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven',
-                    'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
-                    'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen',
-                    'Nineteen', 'Twenty'],
+        'phrases': ['One', 
+                    'Two', 
+                    'Three', 
+                    'Four', 
+                    'Five', 
+                    'Six', 
+                    'Seven',
+                    'Eight', 
+                    'Nine', 
+                    'Ten', 
+                    'Eleven', 
+                    'Twelve', 
+                    'Thirteen',
+                    'Fourteen', 
+                    'Fifteen', 
+                    'Sixteen', 
+                    'Seventeen', 
+                    'Eighteen',
+                    'Nineteen', 
+                    'Twenty'],
         'difficulty': 'beginner'
     },
     'daily_phrases': {
         'title': 'Daily Phrases',
         'description': 'Common phrases for everyday situations',
         'phrases': [
-            'Please', 'Thank you', 'You are welcome', 'Excuse me',
-            'I am sorry', 'Can you help me?', 'Where is the bathroom?',
-            'How much does this cost?', 'I do not understand',
+            'Please', 
+            'Thank you', 
+            'You are welcome', 
+            'Excuse me',
+            'I am sorry', 
+            'Can you help me?', 
+            'Where is the bathroom?',
+            'How much does this cost?', 
+            'I do not understand',
             'Can you speak slower?'
         ],
         'difficulty': 'beginner'
@@ -87,9 +121,16 @@ CURRICULUM = {
         'title': 'Food & Drink',
         'description': 'Essential vocabulary for restaurants and cafes',
         'phrases': [
-            'I would like...', 'Water, please', 'Coffee', 'Tea',
-            'The menu, please', 'The bill, please', 'Is this vegetarian?',
-            'I am allergic to...', 'Delicious!', 'More, please'
+            'I would like...', 
+            'Water, please', 
+            'Coffee', 
+            'Tea',
+            'The menu, please', 
+            'The bill, please', 
+            'Is this vegetarian?',
+            'I am allergic to...', 
+            'Delicious!', 
+            'More, please'
         ],
         'difficulty': 'intermediate'
     },
@@ -97,8 +138,15 @@ CURRICULUM = {
         'title': 'Directions',
         'description': 'Ask for and understand directions',
         'phrases': [
-            'Where is...?', 'Turn left', 'Turn right', 'Go straight',
-            'Near', 'Far', 'Next to', 'Behind', 'In front of',
+            'Where is...?', 
+            'Turn left', 
+            'Turn right', 
+            'Go straight',
+            'Near', 
+            'Far', 
+            'Next to', 
+            'Behind', 
+            'In front of',
             'How do I get to...?'
         ],
         'difficulty': 'intermediate'
