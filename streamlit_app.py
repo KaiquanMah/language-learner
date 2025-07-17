@@ -165,7 +165,7 @@ CURRICULUM = {
 
 # Language options
 LANGUAGES = {
-    'Hebrew': 'il',
+    'Hebrew': 'iw', # 2025.07.17 fix language code
     'Finnish': 'fi',
     'French': 'fr',
     'German': 'de',
@@ -586,7 +586,8 @@ def display_progress_bar():
 
 
 ##########################
-# after selecting a PRACTICE
+# from tab1 - after selecting a PRACTICE
+# the "supposed tab2"
 ##########################
 def practice_interface(teacher: GeminiLanguageTeacher):
     """Main practice interface"""
@@ -650,6 +651,7 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                         st.audio(audio_data, format='audio/mp3')
                 else:
                     st.info("🔇 Audio features are not available. Install audio libraries to enable.")
+
 
         with col2:
             if st.button("🎤 Record Your Voice", key="record_voice",
@@ -982,6 +984,12 @@ def main():
                     with cols[idx % 2]:
                         display_lesson_card(lesson_key, lesson_data)
 
+
+            # the loop does not enter tab2
+            # maybe comment out tab2?
+            # even though original intention might be to go from the 'practice' selected in tab2
+            # to the practice in tab2
+            # the 'if block' above might be running 1st
             with tab2:
                 st.header("🗣️ Practice Mode")
                 if st.session_state.current_topic:
