@@ -880,11 +880,7 @@ def manage_websocket_connection(target_language, api_key):
     
     # Run the async function in the event loop
     loop.run_until_complete(run_websocket())
-
-
-
-
-
+    loop.close()  # Clean up the event loop
 
 def live_conversation_interface():
     """Real-time conversation with Gemini Live"""
