@@ -891,6 +891,43 @@ def live_conversation_interface():
     st.header("🎤 Real-time Conversation")
     st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
     
+    # Initialize session state variables
+    if 'audio_messages' not in st.session_state:
+        st.session_state.audio_messages = []
+    if 'audio_processing' not in st.session_state:
+        st.session_state.audio_processing = False
+    if 'websocket_connected' not in st.session_state:
+        st.session_state.websocket_connected = False
+    
+    # Conversation display
+    conversation_container = st.container()
+    
+    # Status indicators
+    status_col, control_col = st.columns([3, 1])
+    
+    with status_col:
+        if st.session_state.websocket_connected:
+            st.success("🔊 Live connection active")
+        elif st.session_state.audio_processing:
+            st.warning("⌛ Connecting to Gemini Live...")
+        else:
+            st.info("❌ Connection not active")
+    
+    with control_col:
+        if st.session_state.audio_processing:
+            if st.button("🛑 Stop Conversation", use_container_width=True, key="stop_conversation"):
+                st.session_state.audio_processing = False
+                st.rerun()
+        else:
+            if st.button("🎤 Start Conversation", use_container_width=True, key="start_conversation"):
+                st.session_state.audio_processing = True
+                st.session_state.websocket_connected = False
+                st.session_state.audio_messages = []
+                st.rerun()
+    
+    with conversation_container:
+        display_conversation_bubbles()
+    
     # Connection management
     if (st.session_state.audio_processing and 
         not st.session_state.websocket_connected and
@@ -903,6 +940,7 @@ def live_conversation_interface():
         if not api_key:
             st.error("Gemini API key not found")
             st.session_state.audio_processing = False
+            st.rerun()
             return
         
         # Initialize thread state
@@ -936,7 +974,7 @@ def live_conversation_interface():
             if hasattr(st.session_state, attr):
                 delattr(st.session_state, attr)
         st.rerun()
-
+        
 ################################
 
 
