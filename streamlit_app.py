@@ -998,9 +998,6 @@ def live_conversation_interface():
                         st.sidebar.success("Successfully connected to WebSocket")
                     else:
                         st.sidebar.warning(f"WebSocket status: {content}")
-                elif msg_type == 'ensure_messages':
-                    if 'audio_messages' not in st.session_state:
-                        st.session_state.audio_messages = []
                 elif msg_type in ['audio', 'text']:
                     st.session_state.audio_messages.append(content)
                 elif msg_type == 'error':
@@ -1070,17 +1067,38 @@ def live_conversation_interface():
                 daemon=True,
                 name="GeminiWebSocketThread"
             )
+            
+            # Add thread exception handler
+            def thread_exception_handler(args):
+                logger.error(f"Thread {thread.name} failed: {args.exc_value}", exc_info=args.exc_info)
+                st.session_state.ws_message_queue.put(('error', f"Thread error: {str(args.exc_value)}"))
+                if hasattr(st.session_state, '_ws_thread_running'):
+                    del st.session_state._ws_thread_running
+            
+            thread._exc_info = None
+            thread._exception_handler = thread_exception_handler
+            
+            # Add thread start logging
+            logger.info(f"Starting WebSocket thread: {thread.name} (ID: {thread.ident})")
             thread.start()
+            
+            # Verify thread is alive
+            if not thread.is_alive():
+                raise RuntimeError("Failed to start WebSocket thread")
+                
+            logger.info(f"WebSocket thread started successfully: {thread.name} (ID: {thread.ident})")
             st.sidebar.success(f"Started WebSocket thread: {thread.name} (ID: {thread.ident})")
             
         except Exception as e:
-            st.sidebar.error(f"Failed to start WebSocket thread: {str(e)}")
-            st.error(f"Failed to start conversation: {str(e)}")
+            error_msg = f"Failed to start WebSocket thread: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            st.sidebar.error(error_msg)
+            st.error(error_msg)
             st.session_state.audio_processing = False
             if hasattr(st.session_state, '_ws_thread_running'):
                 del st.session_state._ws_thread_running
             st.rerun()
-    
+
     # Clean up thread state when stopping
     if not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
         st.sidebar.write("Cleaning up WebSocket thread...")
