@@ -880,6 +880,12 @@ def live_conversation_interface():
     st.header("🎤 Real-time Conversation")
     st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
     
+    # Debug info
+    st.sidebar.subheader("Debug Info")
+    st.sidebar.write(f"Audio Processing: {st.session_state.get('audio_processing', False)}")
+    st.sidebar.write(f"WebSocket Connected: {st.session_state.get('websocket_connected', False)}")
+    st.sidebar.write(f"Thread Running: {hasattr(st.session_state, '_ws_thread_running')}")
+    
     # Initialize session state variables
     if 'audio_messages' not in st.session_state:
         st.session_state.audio_messages = []
@@ -892,20 +898,23 @@ def live_conversation_interface():
     
     # Process messages from WebSocket thread
     if hasattr(st.session_state, 'ws_message_queue'):
-        while not st.session_state.ws_message_queue.empty():
-            msg_type, content = st.session_state.ws_message_queue.get()
-            
-            if msg_type == 'status':
-                st.session_state.websocket_connected = (content == 'connected')
-            elif msg_type == 'ensure_messages':
-                if 'audio_messages' not in st.session_state:
-                    st.session_state.audio_messages = []
-            elif msg_type == 'audio':
-                st.session_state.audio_messages.append(content)
-            elif msg_type == 'text':
-                st.session_state.audio_messages.append(content)
-            elif msg_type == 'error':
-                st.error(content)
+        try:
+            while not st.session_state.ws_message_queue.empty():
+                msg_type, content = st.session_state.ws_message_queue.get()
+                st.sidebar.write(f"Processing message: {msg_type}")
+                
+                if msg_type == 'status':
+                    st.session_state.websocket_connected = (content == 'connected')
+                    st.sidebar.write(f"Status updated: connected={content == 'connected'}")
+                elif msg_type == 'ensure_messages':
+                    if 'audio_messages' not in st.session_state:
+                        st.session_state.audio_messages = []
+                elif msg_type in ['audio', 'text']:
+                    st.session_state.audio_messages.append(content)
+                elif msg_type == 'error':
+                    st.error(content)
+        except Exception as e:
+            st.sidebar.error(f"Error processing message queue: {str(e)}")
     
     # Conversation display
     conversation_container = st.container()
@@ -941,6 +950,8 @@ def live_conversation_interface():
         not st.session_state.websocket_connected and
         not hasattr(st.session_state, '_ws_thread_running')):
         
+        st.sidebar.write("Starting WebSocket connection...")
+        
         # Get values before starting thread
         target_language = st.session_state.target_language
         api_key = os.getenv('GEMINI_API_KEY', '')
@@ -955,21 +966,26 @@ def live_conversation_interface():
         st.session_state._ws_thread_running = True
         
         # Start WebSocket connection in a separate thread
-        import threading
-        thread = threading.Thread(
-            target=manage_websocket_connection,
-            args=(target_language, api_key),
-            daemon=True
-        )
-        thread.start()
+        try:
+            st.sidebar.write("Creating WebSocket thread...")
+            thread = threading.Thread(
+                target=manage_websocket_connection,
+                args=(target_language, api_key),
+                daemon=True
+            )
+            thread.start()
+            st.sidebar.write("WebSocket thread started")
+        except Exception as e:
+            st.sidebar.error(f"Error starting WebSocket thread: {str(e)}")
+            st.session_state.audio_processing = False
+            if hasattr(st.session_state, '_ws_thread_running'):
+                del st.session_state._ws_thread_running
     
     # Clean up thread state when stopping
     if not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
         # Clean up thread state
         if hasattr(st.session_state, '_ws_thread_running'):
             del st.session_state._ws_thread_running
-        
-        # Only rerun if we're not already in the process of stopping
         st.rerun()
 
 ################################
