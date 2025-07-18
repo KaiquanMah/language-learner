@@ -20,6 +20,7 @@ import asyncio, taskgroup, exceptiongroup
 import contextlib
 from IPython import display
 from fuzzywuzzy import fuzz
+import logging
 
 
 
@@ -782,7 +783,6 @@ def manage_websocket_connection(target_language, api_key):
     INITIAL_REQUEST_TEXT = f"You are a helpful {target_language} language tutor. Help beginners practice conversation."
     
     # Set up logging
-    import logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger('websocket')
     
@@ -964,6 +964,9 @@ def manage_websocket_connection(target_language, api_key):
 
 def live_conversation_interface():
     """Real-time conversation with Gemini Live"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     st.header("🎤 Real-time Conversation")
     st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
     
