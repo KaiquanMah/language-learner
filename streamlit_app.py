@@ -911,14 +911,14 @@ def manage_websocket_connection(target_language, api_key):
                                                 'audio': None
                                             }))
                         
-                    except asyncio.TimeoutError:
-                        # This is expected - just check if we should continue
-                        continue
+                        except asyncio.TimeoutError:
+                            # This is expected - just check if we should continue
+                            continue
                             
-                except Exception as e:
-                    log_to_ui(f"Error in WebSocket message loop: {str(e)}", 'error')
-                    st.session_state.ws_message_queue.put(('error', f"Error processing message: {str(e)}"))
-                    break
+                    except Exception as e:
+                        log_to_ui(f"Error in WebSocket message loop: {str(e)}", 'error')
+                        st.session_state.ws_message_queue.put(('error', f"Error processing message: {str(e)}"))
+                        break
         
         except websockets.exceptions.ConnectionClosedError as e:
             log_to_ui(f"WebSocket connection closed: {str(e)}", 'error')
