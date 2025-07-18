@@ -778,6 +778,8 @@ def display_conversation_bubbles():
 def manage_websocket_connection(target_language, api_key):
     """Manage WebSocket connection to Gemini Live with passed parameters"""
     HOST = 'generativelanguage.googleapis.com'
+    MODEL = 'models/gemini-live-2.5-flash-preview'
+    INITIAL_REQUEST_TEXT = f"You are a helpful {target_language} language tutor. Help beginners practice conversation."
     
     # Set up logging
     import logging
@@ -801,6 +803,32 @@ def manage_websocket_connection(target_language, api_key):
     if not hasattr(st.session_state, 'ws_message_queue'):
         st.session_state.ws_message_queue = queue.Queue()
     
+    def encode_text_input(text: str) -> dict:
+        """Builds JSPB message with user input text."""
+        return {
+            'clientContent': {
+                'turns': [{
+                    'role': 'USER',
+                    'parts': [{'text': text}],
+                }],
+                'turnComplete': True,
+            },
+        }
+    
+    def decode_audio_output(input_data: dict) -> bytes:
+        """Returns byte string with model output audio."""
+        result = []
+        content_input = input_data.get('serverContent', {})
+        content = content_input.get('modelTurn', {})
+        for part in content.get('parts', []):
+            data = part.get('inlineData', {}).get('data', '')
+            if data:
+                try:
+                    result.append(base64.b64decode(data))
+                except Exception as e:
+                    log_to_ui(f"Error decoding audio data: {str(e)}", 'error')
+        return b''.join(result)
+    
     async def run_websocket():
         uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
         
@@ -813,55 +841,17 @@ def manage_websocket_connection(target_language, api_key):
                 
                 # Send initial setup
                 initial_request = {
-                    'generate_config': {
-                        'model': 'models/gemini-1.5-flash',
-                        'generation_config': {
-                            'temperature': 0.7,
-                            'top_p': 0.9,
-                            'top_k': 40,
-                            'max_output_tokens': 2048,
-                            'response_mime_type': 'text/plain',
-                            'response_schema': {
-                                'type': 'object',
-                                'properties': {
-                                    'text': {'type': 'string'},
-                                    'audio': {'type': 'string', 'format': 'byte'}
-                                }
-                            }
-                        },
-                        'safety_settings': [
-                            {
-                                'category': 'HARM_CATEGORY_HARASSMENT',
-                                'threshold': 'BLOCK_NONE'
-                            },
-                            {
-                                'category': 'HARM_CATEGORY_HATE_SPEECH',
-                                'threshold': 'BLOCK_NONE'
-                            },
-                            {
-                                'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                                'threshold': 'BLOCK_NONE'
-                            },
-                            {
-                                'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                                'threshold': 'BLOCK_NONE'
-                            }
-                        ]
+                    'setup': {
+                        'model': MODEL,
                     },
-                    'system_instruction': {
-                        'parts': [
-                            {
-                                'text': f"""You are a friendly {target_language} language tutor. 
-                                Keep responses concise and focused on language learning. 
-                                If the user speaks in English, respond in {target_language} with a translation. 
-                                If they attempt {target_language}, provide gentle corrections and encouragement."""
-                            }
-                        ]
-                    }
                 }
                 
                 log_to_ui("Sending initial request to WebSocket")
                 await websocket.send(json.dumps(initial_request))
+                
+                if INITIAL_REQUEST_TEXT:
+                    await websocket.send(json.dumps(encode_text_input(INITIAL_REQUEST_TEXT)))
+                
                 log_to_ui("Initial request sent successfully")
                 
                 # Main message loop
@@ -871,46 +861,42 @@ def manage_websocket_connection(target_language, api_key):
                         if not getattr(st.session_state, 'audio_processing', True):
                             log_to_ui("Stopping WebSocket connection as requested")
                             break
-                            
+                        
                         # Try to receive a message with a timeout
                         try:
                             message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-                            log_to_ui(f"Received message: {message[:100]}..." if len(message) > 100 else f"Received message: {message}")
+                            log_to_ui(f"Received message: {message[:200]}..." if len(message) > 200 else f"Received message: {message}")
                             
                             # Process the message
                             if message:
-                                server_content = json.loads(message)
+                                response = json.loads(message)
                                 
-                                # Handle model responses
-                                if 'modelTurn' in server_content:
-                                    model_turn = server_content['modelTurn']
-                                    log_to_ui(f"Processing model turn with {len(model_turn.get('parts', []))} parts")
-                                    
-                                    # Ensure messages list exists
-                                    st.session_state.ws_message_queue.put(('ensure_messages', None))
-                                    
-                                    # Process audio parts
-                                    for part in model_turn.get('parts', []):
-                                        if 'inlineData' in part and part['inlineData']['mimeType'] == 'audio/mp3':
-                                            audio_data = base64.b64decode(part['inlineData']['data'])
-                                            if audio_data:
-                                                log_to_ui("Received audio data")
-                                                st.session_state.ws_message_queue.put(('audio', {
+                                # Handle audio output
+                                if audio_data := decode_audio_output(response):
+                                    log_to_ui("Received audio data")
+                                    st.session_state.ws_message_queue.put(('audio', {
+                                        'role': 'bot',
+                                        'text': "[Audio response]",
+                                        'audio': audio_data
+                                    }))
+                                
+                                # Handle text output
+                                if 'serverContent' in response and 'modelTurn' in response['serverContent']:
+                                    model_turn = response['serverContent']['modelTurn']
+                                    if 'parts' in model_turn:
+                                        for part in model_turn['parts']:
+                                            if 'text' in part:
+                                                log_to_ui(f"Received text: {part['text']}")
+                                                st.session_state.ws_message_queue.put(('text', {
                                                     'role': 'bot',
-                                                    'text': "[Audio response]",
-                                                    'audio': audio_data
+                                                    'text': part['text'],
+                                                    'audio': None
                                                 }))
+                                
+                                # Handle turn completion
+                                if response.get('serverContent', {}).get('turnComplete', False):
+                                    log_to_ui("Turn completed")
                                     
-                                    # Process text parts
-                                    for part in model_turn.get('parts', []):
-                                        if 'text' in part:
-                                            log_to_ui(f"Received text: {part['text']}")
-                                            st.session_state.ws_message_queue.put(('text', {
-                                                'role': 'bot',
-                                                'text': part['text'],
-                                                'audio': None
-                                            }))
-                        
                         except asyncio.TimeoutError:
                             # This is expected - just check if we should continue
                             continue
