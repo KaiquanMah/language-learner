@@ -835,7 +835,20 @@ def manage_websocket_connection(target_language, api_key):
         try:
             log_to_ui(f"Attempting to connect to WebSocket at {uri}")
             
-            async with websockets.connect(uri, ping_interval=10, ping_timeout=10) as websocket:
+            # Add connection timeout
+            try:
+                async with asyncio.timeout(10):  # 10 second timeout for connection
+                    websocket = await websockets.connect(uri, ping_interval=10, ping_timeout=10)
+            except asyncio.TimeoutError:
+                log_to_ui("WebSocket connection timed out", 'error')
+                st.session_state.ws_message_queue.put(('error', "Connection to Gemini Live API timed out"))
+                return
+            except Exception as e:
+                log_to_ui(f"WebSocket connection failed: {str(e)}", 'error')
+                st.session_state.ws_message_queue.put(('error', f"Failed to connect to Gemini Live API: {str(e)}"))
+                return
+            
+            try:
                 log_to_ui("WebSocket connection established")
                 st.session_state.ws_message_queue.put(('status', 'connected'))
                 
@@ -848,9 +861,13 @@ def manage_websocket_connection(target_language, api_key):
                 
                 log_to_ui("Sending initial request to WebSocket")
                 await websocket.send(json.dumps(initial_request))
+                log_to_ui(f"Sent initial request: {json.dumps(initial_request, indent=2)}")
                 
                 if INITIAL_REQUEST_TEXT:
-                    await websocket.send(json.dumps(encode_text_input(INITIAL_REQUEST_TEXT)))
+                    text_request = encode_text_input(INITIAL_REQUEST_TEXT)
+                    log_to_ui(f"Sending initial text: {INITIAL_REQUEST_TEXT}")
+                    await websocket.send(json.dumps(text_request))
+                    log_to_ui(f"Sent text request: {json.dumps(text_request, indent=2)}")
                 
                 log_to_ui("Initial request sent successfully")
                 
@@ -897,6 +914,13 @@ def manage_websocket_connection(target_language, api_key):
                                 if response.get('serverContent', {}).get('turnComplete', False):
                                     log_to_ui("Turn completed")
                                     
+                                # Handle errors from the server
+                                if 'error' in response:
+                                    error_msg = response.get('error', {}).get('message', 'Unknown error')
+                                    log_to_ui(f"Server error: {error_msg}", 'error')
+                                    st.session_state.ws_message_queue.put(('error', f"Server error: {error_msg}"))
+                                    break
+                                    
                         except asyncio.TimeoutError:
                             # This is expected - just check if we should continue
                             continue
@@ -905,19 +929,27 @@ def manage_websocket_connection(target_language, api_key):
                         log_to_ui(f"Error in WebSocket message loop: {str(e)}", 'error')
                         st.session_state.ws_message_queue.put(('error', f"Error processing message: {str(e)}"))
                         break
-        
-        except websockets.exceptions.ConnectionClosedError as e:
-            log_to_ui(f"WebSocket connection closed: {str(e)}", 'error')
-            st.session_state.ws_message_queue.put(('error', f"Connection closed unexpectedly: {str(e)}"))
             
+            except websockets.exceptions.ConnectionClosed as e:
+                log_to_ui(f"WebSocket connection closed: {e.code} - {e.reason}", 'error')
+                st.session_state.ws_message_queue.put(('error', f"Connection closed: {e.reason}"))
+                
+            except Exception as e:
+                log_to_ui(f"Error in WebSocket connection: {str(e)}", 'error')
+                st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
+                
+            finally:
+                await websocket.close()
+                log_to_ui("WebSocket connection closed")
+                st.session_state.ws_message_queue.put(('status', 'disconnected'))
+        
         except Exception as e:
-            log_to_ui(f"WebSocket error: {str(e)}", 'error')
-            st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
+            log_to_ui(f"Fatal error in WebSocket handler: {str(e)}", 'error')
+            st.session_state.ws_message_queue.put(('error', f"Fatal error: {str(e)}"))
             
         finally:
-            log_to_ui("WebSocket connection closed")
-            st.session_state.ws_message_queue.put(('status', 'disconnected'))
-    
+            log_to_ui("WebSocket handler exiting")
+
     try:
         # Run the async function in the event loop
         log_to_ui("Starting WebSocket event loop")
