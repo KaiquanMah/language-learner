@@ -10,12 +10,14 @@ from typing import Dict, List, Optional, Tuple
 import google.generativeai as genai
 # from google import genai
 from dotenv import load_dotenv
-import asyncio
+
+# import asyncio
 import websockets
 import queue
+import base64
 import threading
 import asyncio, taskgroup, exceptiongroup
-import asyncio, contextlib, json
+import contextlib
 from IPython import display
 from fuzzywuzzy import fuzz
 
@@ -787,8 +789,10 @@ def manage_websocket_connection(target_language, api_key):
         
         try:
             async with websockets.connect(uri, ping_interval=10, ping_timeout=10) as websocket:
-                # Update connection status
-                st.session_state.websocket_connected = True
+                # Update connection status in session state
+                if 'websocket_connected' in st.session_state:
+                    st.session_state.websocket_connected = True
+                    st.rerun()
                 
                 # Send initial setup
                 initial_request = json.dumps({
@@ -812,7 +816,7 @@ def manage_websocket_connection(target_language, api_key):
                     await websocket.send(text_request)
                 
                 # Process messages
-                while st.session_state.audio_processing:
+                while 'audio_processing' in st.session_state and st.session_state.audio_processing:
                     try:
                         message = await asyncio.wait_for(websocket.recv(), timeout=5)
                         data = json.loads(message)
@@ -825,6 +829,10 @@ def manage_websocket_connection(target_language, api_key):
                             if 'modelTurn' in server_content:
                                 model_turn = server_content['modelTurn']
                                 
+                                # Initialize messages list if not exists
+                                if 'audio_messages' not in st.session_state:
+                                    st.session_state.audio_messages = []
+                                
                                 # Process audio parts
                                 for part in model_turn.get('parts', []):
                                     if 'inlineData' in part and 'data' in part['inlineData']:
@@ -836,6 +844,7 @@ def manage_websocket_connection(target_language, api_key):
                                                 'text': "[Audio response]",
                                                 'audio': audio_data
                                             })
+                                            st.rerun()
                                 
                                 # Process text parts
                                 for part in model_turn.get('parts', []):
@@ -846,6 +855,7 @@ def manage_websocket_connection(target_language, api_key):
                                             'text': part['text'],
                                             'audio': None
                                         })
+                                        st.rerun()
                     
                     except asyncio.TimeoutError:
                         # Timeout is normal, just check if we should continue
@@ -859,10 +869,16 @@ def manage_websocket_connection(target_language, api_key):
         except Exception as e:
             st.error(f"WebSocket error: {str(e)}")
         finally:
-            st.session_state.websocket_connected = False
+            if 'websocket_connected' in st.session_state:
+                st.session_state.websocket_connected = False
+                st.rerun()
     
-    # Run the async function
-    asyncio.run(run_websocket())
+    # Run the async function in the event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run_websocket())
+
+
 
 def live_conversation_interface():
     """Real-time conversation with Gemini Live"""
