@@ -793,12 +793,7 @@ def manage_websocket_connection(target_language, api_key):
         
         try:
             async with websockets.connect(uri, ping_interval=10, ping_timeout=10) as websocket:
-                # Update connection status in session state using a callback
-                def update_connection_status(connected):
-                    st.session_state.websocket_connected = connected
-                    st.rerun()
-                
-                # Run the update in the main thread
+                # Update connection status using thread-safe state
                 st.session_state._ws_connected = True
                 st.session_state._ws_should_rerun = True
                 
@@ -888,45 +883,13 @@ def manage_websocket_connection(target_language, api_key):
 
 
 
+
+
+
 def live_conversation_interface():
     """Real-time conversation with Gemini Live"""
     st.header("🎤 Real-time Conversation")
     st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
-    
-    # Initialize session state variables
-    if 'audio_messages' not in st.session_state:
-        st.session_state.audio_messages = []
-    if 'audio_processing' not in st.session_state:
-        st.session_state.audio_processing = False
-    if 'websocket_connected' not in st.session_state:
-        st.session_state.websocket_connected = False
-    
-    # Conversation display
-    conversation_container = st.container()
-    
-    # Status indicators
-    status_col, control_col = st.columns([3, 1])
-    
-    with status_col:
-        if st.session_state.websocket_connected:
-            st.success("🔊 Live connection active")
-        elif st.session_state.audio_processing:
-            st.warning("⌛ Connecting to Gemini Live...")
-        else:
-            st.info("❌ Connection not active")
-    
-    with control_col:
-        if st.session_state.audio_processing:
-            if st.button("🛑 Stop Conversation", use_container_width=True, key="stop_conversation"):
-                st.session_state.audio_processing = False
-        else:
-            if st.button("🎤 Start Conversation", use_container_width=True, key="start_conversation"):
-                st.session_state.audio_processing = True
-                st.session_state.websocket_connected = False
-                st.session_state.audio_messages = []
-    
-    with conversation_container:
-        display_conversation_bubbles()
     
     # Connection management
     if (st.session_state.audio_processing and 
@@ -973,7 +936,12 @@ def live_conversation_interface():
             if hasattr(st.session_state, attr):
                 delattr(st.session_state, attr)
         st.rerun()
-{{ ... }}
+
+################################
+
+
+
+
 
 def main():
     """Main application"""
