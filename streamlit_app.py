@@ -784,15 +784,23 @@ def manage_websocket_connection(target_language, api_key):
     MODEL = 'models/gemini-live-2.5-flash-preview'
     INITIAL_REQUEST_TEXT = f"You are a helpful language tutor for {target_language}. Help beginners practice conversation."
     
+    # Create a new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     async def run_websocket():
         uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
         
         try:
             async with websockets.connect(uri, ping_interval=10, ping_timeout=10) as websocket:
-                # Update connection status in session state
-                if 'websocket_connected' in st.session_state:
-                    st.session_state.websocket_connected = True
+                # Update connection status in session state using a callback
+                def update_connection_status(connected):
+                    st.session_state.websocket_connected = connected
                     st.rerun()
+                
+                # Run the update in the main thread
+                st.session_state._ws_connected = True
+                st.session_state._ws_should_rerun = True
                 
                 # Send initial setup
                 initial_request = json.dumps({
@@ -844,7 +852,7 @@ def manage_websocket_connection(target_language, api_key):
                                                 'text': "[Audio response]",
                                                 'audio': audio_data
                                             })
-                                            st.rerun()
+                                            st.session_state._ws_should_rerun = True
                                 
                                 # Process text parts
                                 for part in model_turn.get('parts', []):
@@ -855,27 +863,27 @@ def manage_websocket_connection(target_language, api_key):
                                             'text': part['text'],
                                             'audio': None
                                         })
-                                        st.rerun()
-                    
+                                        st.session_state._ws_should_rerun = True
+                        
                     except asyncio.TimeoutError:
                         # Timeout is normal, just check if we should continue
                         continue
                     except Exception as e:
-                        st.error(f"Error processing message: {str(e)}")
+                        st.session_state._ws_error = f"Error processing message: {str(e)}"
+                        st.session_state._ws_should_rerun = True
                         break
         
         except websockets.exceptions.ConnectionClosedError as e:
-            st.error(f"Connection closed unexpectedly: {str(e)}")
+            st.session_state._ws_error = f"Connection closed unexpectedly: {str(e)}"
+            st.session_state._ws_should_rerun = True
         except Exception as e:
-            st.error(f"WebSocket error: {str(e)}")
+            st.session_state._ws_error = f"WebSocket error: {str(e)}"
+            st.session_state._ws_should_rerun = True
         finally:
-            if 'websocket_connected' in st.session_state:
-                st.session_state.websocket_connected = False
-                st.rerun()
+            st.session_state._ws_connected = False
+            st.session_state._ws_should_rerun = True
     
     # Run the async function in the event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     loop.run_until_complete(run_websocket())
 
 
@@ -934,8 +942,11 @@ def live_conversation_interface():
             st.session_state.audio_processing = False
             return
         
-        # Mark thread as running
+        # Initialize thread state
         st.session_state._ws_thread_running = True
+        st.session_state._ws_connected = False
+        st.session_state._ws_should_rerun = False
+        st.session_state._ws_error = None
         
         # Start WebSocket connection in a separate thread
         threading.Thread(
@@ -943,15 +954,26 @@ def live_conversation_interface():
             args=(target_language, api_key),
             daemon=True
         ).start()
-    elif not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
+    
+    # Handle WebSocket status updates from the thread
+    if hasattr(st.session_state, '_ws_should_rerun') and st.session_state._ws_should_rerun:
+        st.session_state.websocket_connected = getattr(st.session_state, '_ws_connected', False)
+        st.session_state._ws_should_rerun = False
+        
+        if hasattr(st.session_state, '_ws_error') and st.session_state._ws_error:
+            st.error(st.session_state._ws_error)
+            del st.session_state._ws_error
+        
+        st.rerun()
+    
+    # Clean up thread state when stopping
+    if not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
         # Clean up thread state
-        del st.session_state._ws_thread_running
-
-################################
-
-
-
-
+        for attr in ['_ws_thread_running', '_ws_connected', '_ws_should_rerun', '_ws_error']:
+            if hasattr(st.session_state, attr):
+                delattr(st.session_state, attr)
+        st.rerun()
+{{ ... }}
 
 def main():
     """Main application"""
