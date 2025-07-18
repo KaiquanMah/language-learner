@@ -775,9 +775,6 @@ def display_conversation_bubbles():
             if 'audio' in msg and msg['audio'] is not None:
                 st.audio(msg['audio'], format='audio/mp3')
 
-
-
-
 def manage_websocket_connection(target_language, api_key):
     """Manage WebSocket connection to Gemini Live with passed parameters"""
     HOST = 'generativelanguage.googleapis.com'
@@ -788,14 +785,17 @@ def manage_websocket_connection(target_language, api_key):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
+    # Create a queue for thread-safe communication
+    if not hasattr(st.session_state, 'ws_message_queue'):
+        st.session_state.ws_message_queue = queue.Queue()
+    
     async def run_websocket():
         uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
         
         try:
             async with websockets.connect(uri, ping_interval=10, ping_timeout=10) as websocket:
-                # Update connection status using thread-safe state
-                st.session_state._ws_connected = True
-                st.session_state._ws_should_rerun = True
+                # Put connection status update in queue
+                st.session_state.ws_message_queue.put(('status', 'connected'))
                 
                 # Send initial setup
                 initial_request = json.dumps({
@@ -832,51 +832,44 @@ def manage_websocket_connection(target_language, api_key):
                             if 'modelTurn' in server_content:
                                 model_turn = server_content['modelTurn']
                                 
-                                # Initialize messages list if not exists
-                                if 'audio_messages' not in st.session_state:
-                                    st.session_state.audio_messages = []
+                                # Initialize messages list if not exists in session state via queue
+                                st.session_state.ws_message_queue.put(('ensure_messages', None))
                                 
                                 # Process audio parts
                                 for part in model_turn.get('parts', []):
                                     if 'inlineData' in part and 'data' in part['inlineData']:
                                         audio_data = base64.b64decode(part['inlineData']['data'])
                                         if audio_data:
-                                            # Add to conversation
-                                            st.session_state.audio_messages.append({
+                                            # Add to conversation via queue
+                                            st.session_state.ws_message_queue.put(('audio', {
                                                 'role': 'bot',
                                                 'text': "[Audio response]",
                                                 'audio': audio_data
-                                            })
-                                            st.session_state._ws_should_rerun = True
+                                            }))
                                 
                                 # Process text parts
                                 for part in model_turn.get('parts', []):
                                     if 'text' in part:
-                                        # Add to conversation
-                                        st.session_state.audio_messages.append({
+                                        # Add to conversation via queue
+                                        st.session_state.ws_message_queue.put(('text', {
                                             'role': 'bot',
                                             'text': part['text'],
                                             'audio': None
-                                        })
-                                        st.session_state._ws_should_rerun = True
+                                        }))
                         
                     except asyncio.TimeoutError:
                         # Timeout is normal, just check if we should continue
                         continue
                     except Exception as e:
-                        st.session_state._ws_error = f"Error processing message: {str(e)}"
-                        st.session_state._ws_should_rerun = True
+                        st.session_state.ws_message_queue.put(('error', f"Error processing message: {str(e)}"))
                         break
         
         except websockets.exceptions.ConnectionClosedError as e:
-            st.session_state._ws_error = f"Connection closed unexpectedly: {str(e)}"
-            st.session_state._ws_should_rerun = True
+            st.session_state.ws_message_queue.put(('error', f"Connection closed unexpectedly: {str(e)}"))
         except Exception as e:
-            st.session_state._ws_error = f"WebSocket error: {str(e)}"
-            st.session_state._ws_should_rerun = True
+            st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
         finally:
-            st.session_state._ws_connected = False
-            st.session_state._ws_should_rerun = True
+            st.session_state.ws_message_queue.put(('status', 'disconnected'))
     
     # Run the async function in the event loop
     loop.run_until_complete(run_websocket())
@@ -894,6 +887,25 @@ def live_conversation_interface():
         st.session_state.audio_processing = False
     if 'websocket_connected' not in st.session_state:
         st.session_state.websocket_connected = False
+    if 'ws_message_queue' not in st.session_state:
+        st.session_state.ws_message_queue = queue.Queue()
+    
+    # Process messages from WebSocket thread
+    if hasattr(st.session_state, 'ws_message_queue'):
+        while not st.session_state.ws_message_queue.empty():
+            msg_type, content = st.session_state.ws_message_queue.get()
+            
+            if msg_type == 'status':
+                st.session_state.websocket_connected = (content == 'connected')
+            elif msg_type == 'ensure_messages':
+                if 'audio_messages' not in st.session_state:
+                    st.session_state.audio_messages = []
+            elif msg_type == 'audio':
+                st.session_state.audio_messages.append(content)
+            elif msg_type == 'text':
+                st.session_state.audio_messages.append(content)
+            elif msg_type == 'error':
+                st.error(content)
     
     # Conversation display
     conversation_container = st.container()
@@ -941,36 +953,25 @@ def live_conversation_interface():
         
         # Initialize thread state
         st.session_state._ws_thread_running = True
-        st.session_state._ws_connected = False
-        st.session_state._ws_should_rerun = False
-        st.session_state._ws_error = None
         
         # Start WebSocket connection in a separate thread
-        threading.Thread(
+        import threading
+        thread = threading.Thread(
             target=manage_websocket_connection,
             args=(target_language, api_key),
             daemon=True
-        ).start()
-    
-    # Handle WebSocket status updates from the thread
-    if hasattr(st.session_state, '_ws_should_rerun') and st.session_state._ws_should_rerun:
-        st.session_state.websocket_connected = getattr(st.session_state, '_ws_connected', False)
-        st.session_state._ws_should_rerun = False
-        
-        if hasattr(st.session_state, '_ws_error') and st.session_state._ws_error:
-            st.error(st.session_state._ws_error)
-            del st.session_state._ws_error
-        
-        st.rerun()
+        )
+        thread.start()
     
     # Clean up thread state when stopping
     if not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
         # Clean up thread state
-        for attr in ['_ws_thread_running', '_ws_connected', '_ws_should_rerun', '_ws_error']:
-            if hasattr(st.session_state, attr):
-                delattr(st.session_state, attr)
-        st.rerun()
+        if hasattr(st.session_state, '_ws_thread_running'):
+            del st.session_state._ws_thread_running
         
+        # Only rerun if we're not already in the process of stopping
+        st.rerun()
+
 ################################
 
 
