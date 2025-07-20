@@ -3,6 +3,7 @@ google-generativeai>=0.3.0 # deprecated
 python-dotenv>=1.0.0
 gtts>=2.4.0
 fuzzywuzzy # flexible string matching
+python-Levenshtein # Levenshtein distance for fuzzy matching
 #############################
 # libraries no longer used are below
 #############################
