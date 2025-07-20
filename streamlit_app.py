@@ -10,7 +10,6 @@ from typing import Dict, List, Optional, Tuple
 import google.generativeai as genai
 # from google import genai
 from dotenv import load_dotenv
-# import wave
 
 from fuzzywuzzy import fuzz
 # disable file watcher
@@ -28,7 +27,6 @@ os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 try:
     import speech_recognition as sr
     from gtts import gTTS
-    # import pygame
 
     AUDIO_ENABLED = True
 except ImportError:
@@ -567,7 +565,8 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 "🔇 Audio features are not available. To enable audio, install the optional audio libraries listed in requirements.txt")
 
 
-        col1, col2, col3 = st.columns(3)
+        # col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
 
         # Audio controls
         with col1:
@@ -594,18 +593,18 @@ def practice_interface(teacher: GeminiLanguageTeacher):
 
         # currently not updating the 'selected_phrase' st.selectbox
         # maybe comment out this line?
-        with col3:
-            if st.button("📝 Next Phrase", key="next_phrase",
-                         help="Move to the next phrase"):
-                # Find next phrase
-                current_idx = current_lesson['phrases'].index(selected_phrase)
-                if current_idx < len(current_lesson['phrases']) - 1:
-                    next_phrase = current_lesson['phrases'][current_idx + 1]
-                    st.success(f"Moving to: {next_phrase}")
-                else:
-                    st.session_state.lesson_completed.add(st.session_state.current_topic)
-                    st.balloons()
-                    st.success("🎉 Lesson completed!")
+        # with col3:
+        #     if st.button("📝 Next Phrase", key="next_phrase",
+        #                  help="Move to the next phrase"):
+        #         # Find next phrase
+        #         current_idx = current_lesson['phrases'].index(selected_phrase)
+        #         if current_idx < len(current_lesson['phrases']) - 1:
+        #             next_phrase = current_lesson['phrases'][current_idx + 1]
+        #             st.success(f"Moving to: {next_phrase}")
+        #         else:
+        #             st.session_state.lesson_completed.add(st.session_state.current_topic)
+        #             st.balloons()
+        #             st.success("🎉 Lesson completed!")
         ###############################
 
 
