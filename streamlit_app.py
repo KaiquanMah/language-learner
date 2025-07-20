@@ -875,8 +875,8 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
             st.session_state.conversation_history = []  # Clear previous conversation
             st.rerun()
 
-    # Audio recording
-    elif st.session_state.conversation_state == 'recording':
+    # Always show recording interface when in recording state
+    if st.session_state.conversation_state == 'recording':
         st.markdown(f"### 🎤 Speak in {st.session_state.target_language}")
         
         # Add a back button at the top
