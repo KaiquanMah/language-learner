@@ -2,7 +2,6 @@ streamlit>=1.28.0
 google-generativeai>=0.3.0 # deprecated
 python-dotenv>=1.0.0
 gtts>=2.4.0
-pygame>=2.5.0
 fuzzywuzzy # flexible string matching
 #############################
 # libraries no longer used are below
@@ -15,4 +14,5 @@ fuzzywuzzy # flexible string matching
 # SpeechRecognition>=3.10.0
 # streamlit-webrtc>=0.45.0
 # pydub>=0.25.1
+# pygame>=2.5.0
 #############################
