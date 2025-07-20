@@ -891,192 +891,98 @@ def display_conversation_bubbles():
             if 'audio' in msg and msg['audio'] is not None:
                 st.audio(msg['audio'], format='audio/mp3')
 
-def manage_websocket_connection(target_language, api_key):
+def manage_websocket_connection(target_language: str, api_key: str, audio_session):
     """Manage WebSocket connection to Gemini Live with passed parameters"""
-    HOST = 'generativelanguage.googleapis.com'
-    MODEL = 'models/gemini-live-2.5-flash-preview'
-    INITIAL_REQUEST_TEXT = f"You are a helpful {target_language} language tutor. Help beginners practice conversation."
+    logger = logging.getLogger(__name__)
     
-    # Set up logging
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('websocket')
-    
-    def log_to_ui(message, level='info'):
-        """Helper to log messages to the UI and console"""
+    async def run_websocket():
         try:
-            if hasattr(st.session_state, 'ws_message_queue'):
-                st.session_state.ws_message_queue.put(('log', f"{level.upper()}: {message}"))
-            logger.log(getattr(logging, level.upper()), message)
+            uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}"
+            
+            async with websockets.connect(uri) as websocket:
+                logger.info("WebSocket connection established")
+                st.session_state.ws_message_queue.put(('status', 'connected'))
+                
+                # Send initial configuration
+                config_message = {
+                    "config": {
+                        "model": "models/gemini-live-2.5-flash-preview",
+                        "generation_config": {
+                            "language_code": target_language.split("-")[0],
+                            "response_mime_type": "audio/wav"
+                        }
+                    }
+                }
+                await websocket.send(json.dumps(config_message))
+                
+                while st.session_state.audio_processing:
+                    try:
+                        # Check for audio data to send
+                        if audio_session and hasattr(audio_session, 'get_audio_chunk'):
+                            audio_chunk = await audio_session.get_audio_chunk()
+                            if audio_chunk:
+                                audio_message = {
+                                    "audio": {
+                                        "data": base64.b64encode(audio_chunk).decode('utf-8'),
+                                        "mime_type": "audio/wav"
+                                    }
+                                }
+                                await websocket.send(json.dumps(audio_message))
+                        
+                        # Receive messages with timeout
+                        try:
+                            message = await asyncio.wait_for(websocket.recv(), timeout=0.1)
+                            response = json.loads(message)
+                            
+                            # Handle different response types
+                            if 'audio' in response:
+                                audio_data = base64.b64decode(response['audio']['data'])
+                                st.session_state.ws_message_queue.put(('audio', {
+                                    'role': 'assistant',
+                                    'text': response.get('text', ''),
+                                    'audio': audio_data
+                                }))
+                                
+                                # Add to playback queue
+                                if audio_session and hasattr(audio_session, 'enqueue_audio'):
+                                    await audio_session.enqueue_audio(audio_data)
+                            
+                            elif 'text' in response:
+                                st.session_state.ws_message_queue.put(('text', {
+                                    'role': 'assistant',
+                                    'text': response['text']
+                                }))
+                            
+                        except asyncio.TimeoutError:
+                            # No message received, continue the loop
+                            continue
+                            
+                    except Exception as e:
+                        logger.error(f"Error in WebSocket loop: {str(e)}", exc_info=True)
+                        st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
+                        break
+                
+                logger.info("WebSocket connection closing")
+                st.session_state.ws_message_queue.put(('status', 'disconnected'))
+                
         except Exception as e:
-            logger.error(f"Error logging to UI: {e}")
+            logger.error(f"WebSocket connection failed: {str(e)}", exc_info=True)
+            st.session_state.ws_message_queue.put(('error', f"Connection failed: {str(e)}"))
+            st.session_state.ws_message_queue.put(('status', 'disconnected'))
     
     # Create a new event loop for this thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
-    # Create a queue for thread-safe communication if it doesn't exist
-    if not hasattr(st.session_state, 'ws_message_queue'):
-        st.session_state.ws_message_queue = queue.Queue()
-    
-    def encode_text_input(text: str) -> dict:
-        """Builds JSPB message with user input text."""
-        return {
-            'clientContent': {
-                'turns': [{
-                    'role': 'USER',
-                    'parts': [{'text': text}],
-                }],
-                'turnComplete': True,
-            },
-        }
-    
-    def decode_audio_output(input_data: dict) -> bytes:
-        """Returns byte string with model output audio."""
-        result = []
-        content_input = input_data.get('serverContent', {})
-        content = content_input.get('modelTurn', {})
-        for part in content.get('parts', []):
-            data = part.get('inlineData', {}).get('data', '')
-            if data:
-                try:
-                    result.append(base64.b64decode(data))
-                except Exception as e:
-                    log_to_ui(f"Error decoding audio data: {str(e)}", 'error')
-        return b''.join(result)
-    
-    async def run_websocket():
-        uri = f'wss://{HOST}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}'
-        
-        try:
-            log_to_ui(f"Attempting to connect to WebSocket at {uri}")
-            
-            # Add connection timeout
-            try:
-                async with asyncio.timeout(10):  # 10 second timeout for connection
-                    websocket = await websockets.connect(uri, ping_interval=10, ping_timeout=10)
-            except asyncio.TimeoutError:
-                log_to_ui("WebSocket connection timed out", 'error')
-                st.session_state.ws_message_queue.put(('error', "Connection to Gemini Live API timed out"))
-                return
-            except Exception as e:
-                log_to_ui(f"WebSocket connection failed: {str(e)}", 'error')
-                st.session_state.ws_message_queue.put(('error', f"Failed to connect to Gemini Live API: {str(e)}"))
-                return
-            
-            try:
-                log_to_ui("WebSocket connection established")
-                st.session_state.ws_message_queue.put(('status', 'connected'))
-                
-                # Send initial setup
-                initial_request = {
-                    'setup': {
-                        'model': MODEL,
-                    },
-                }
-                
-                log_to_ui("Sending initial request to WebSocket")
-                await websocket.send(json.dumps(initial_request))
-                log_to_ui(f"Sent initial request: {json.dumps(initial_request, indent=2)}")
-                
-                if INITIAL_REQUEST_TEXT:
-                    text_request = encode_text_input(INITIAL_REQUEST_TEXT)
-                    log_to_ui(f"Sending initial text: {INITIAL_REQUEST_TEXT}")
-                    await websocket.send(json.dumps(text_request))
-                    log_to_ui(f"Sent text request: {json.dumps(text_request, indent=2)}")
-                
-                log_to_ui("Initial request sent successfully")
-                
-                # Main message loop
-                while True:
-                    try:
-                        # Check if we should stop
-                        if not getattr(st.session_state, 'audio_processing', True):
-                            log_to_ui("Stopping WebSocket connection as requested")
-                            break
-                        
-                        # Try to receive a message with a timeout
-                        try:
-                            message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-                            log_to_ui(f"Received message: {message[:200]}..." if len(message) > 200 else f"Received message: {message}")
-                            
-                            # Process the message
-                            if message:
-                                response = json.loads(message)
-                                
-                                # Handle audio output
-                                if audio_data := decode_audio_output(response):
-                                    log_to_ui("Received audio data")
-                                    st.session_state.ws_message_queue.put(('audio', {
-                                        'role': 'bot',
-                                        'text': "[Audio response]",
-                                        'audio': audio_data
-                                    }))
-                                
-                                # Handle text output
-                                if 'serverContent' in response and 'modelTurn' in response['serverContent']:
-                                    model_turn = response['serverContent']['modelTurn']
-                                    if 'parts' in model_turn:
-                                        for part in model_turn['parts']:
-                                            if 'text' in part:
-                                                log_to_ui(f"Received text: {part['text']}")
-                                                st.session_state.ws_message_queue.put(('text', {
-                                                    'role': 'bot',
-                                                    'text': part['text'],
-                                                    'audio': None
-                                                }))
-                                
-                                # Handle turn completion
-                                if response.get('serverContent', {}).get('turnComplete', False):
-                                    log_to_ui("Turn completed")
-                                    
-                                # Handle errors from the server
-                                if 'error' in response:
-                                    error_msg = response.get('error', {}).get('message', 'Unknown error')
-                                    log_to_ui(f"Server error: {error_msg}", 'error')
-                                    st.session_state.ws_message_queue.put(('error', f"Server error: {error_msg}"))
-                                    break
-                                    
-                        except asyncio.TimeoutError:
-                            # This is expected - just check if we should continue
-                            continue
-                            
-                    except Exception as e:
-                        log_to_ui(f"Error in WebSocket message loop: {str(e)}", 'error')
-                        st.session_state.ws_message_queue.put(('error', f"Error processing message: {str(e)}"))
-                        break
-            
-            except websockets.exceptions.ConnectionClosed as e:
-                log_to_ui(f"WebSocket connection closed: {e.code} - {e.reason}", 'error')
-                st.session_state.ws_message_queue.put(('error', f"Connection closed: {e.reason}"))
-                
-            except Exception as e:
-                log_to_ui(f"Error in WebSocket connection: {str(e)}", 'error')
-                st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
-                
-            finally:
-                await websocket.close()
-                log_to_ui("WebSocket connection closed")
-                st.session_state.ws_message_queue.put(('status', 'disconnected'))
-        
-        except Exception as e:
-            log_to_ui(f"Fatal error in WebSocket handler: {str(e)}", 'error')
-            st.session_state.ws_message_queue.put(('error', f"Fatal error: {str(e)}"))
-            
-        finally:
-            log_to_ui("WebSocket handler exiting")
-
     try:
-        # Run the async function in the event loop
-        log_to_ui("Starting WebSocket event loop")
         loop.run_until_complete(run_websocket())
     except Exception as e:
-        log_to_ui(f"Error in WebSocket event loop: {str(e)}", 'error')
-        st.session_state.ws_message_queue.put(('error', f"Error in WebSocket: {str(e)}"))
+        logger.error(f"WebSocket thread error: {str(e)}", exc_info=True)
+        st.session_state.ws_message_queue.put(('error', f"Thread error: {str(e)}"))
     finally:
-        log_to_ui("Closing WebSocket event loop")
         loop.close()
-        log_to_ui("WebSocket event loop closed")
+        if hasattr(st.session_state, '_ws_thread_running'):
+            del st.session_state._ws_thread_running
 
 def live_conversation_interface():
     """Real-time conversation with Gemini Live"""
