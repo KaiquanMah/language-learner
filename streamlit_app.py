@@ -730,9 +730,10 @@ def main():
             # Show MAIN NAVIGATION TABS
             # WHEN THE PAGE LOADS INITIALLY
             # tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "🎤 Live Conversation", "📊 Progress"])
-            tab1 = st.tabs(["📚 Lessons"])
+            
+            # with tab1:
+            with st.container():
 
-            with tab1:
                 st.header("Choose Your Lesson")
 
                 # Display LESSON CARDS in a grid
