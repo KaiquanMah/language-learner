@@ -25,7 +25,7 @@ import asyncio, taskgroup, exceptiongroup
 import contextlib
 from IPython import display
 from fuzzywuzzy import fuzz
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 
 
