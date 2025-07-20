@@ -846,7 +846,19 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
         st.markdown("### Conversation History")
         for i, msg in enumerate(st.session_state.conversation_history):
             role = "You" if msg['role'] == 'user' else "Tutor"
-            st.markdown(f"**{role}**: {msg['content']}")
+            
+            # Display the message
+            col1, col2 = st.columns([1, 20])
+            with col1:
+                st.markdown(f"**{role}:**")
+            with col2:
+                st.markdown(msg['content'])
+            
+            # Display audio player if audio is available
+            if msg['role'] == 'assistant' and 'audio_key' in msg and msg['audio_key'] in st.session_state:
+                st.audio(st.session_state[msg['audio_key']], format='audio/mp3')
+            
+            st.markdown("---")  # Add a separator between messages
     
     # Language selection
     if st.session_state.conversation_state == 'language_selection':
@@ -910,44 +922,43 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
             try:
                 # Add user message to history if not already added
                 if not st.session_state.conversation_history or st.session_state.conversation_history[-1]['role'] != 'user':
-                    # Only store a reference to the audio data, not the data itself
                     st.session_state.conversation_history.append({
                         'role': 'user',
-                        'content': "🎤 [Audio message]",
-                        'has_audio': st.session_state.audio_data is not None
+                        'content': "🎤 [Audio message]"
                     })
                 
                 # Process the audio with Gemini
-                response = teacher.process_audio(
-                    audio_data=st.session_state.audio_data,
-                    language=st.session_state.target_language
-                )
-                
-                # Add assistant's response to history
-                if 'text' in response and response['text']:
-                    st.session_state.conversation_history.append({
-                        'role': 'assistant',
-                        'content': response['text']
-                    })
+                if 'audio_data' in st.session_state and st.session_state.audio_data is not None:
+                    response = teacher.process_audio(
+                        audio_data=st.session_state.audio_data,
+                        language=st.session_state.target_language
+                    )
                     
-                    # Generate audio for the response
-                    try:
-                        audio_data = text_to_speech(
-                            response['text'],
-                            LANGUAGES[st.session_state.target_language]
-                        )
-                        # Store the audio data in session state with a unique key
-                        audio_key = f"response_audio_{len(st.session_state.conversation_history)}"
-                        st.session_state[audio_key] = audio_data
-                        # Store only the key in the conversation history
-                        st.session_state.conversation_history[-1]['audio_key'] = audio_key
-                    except Exception as e:
-                        print(f"Error generating speech: {str(e)}")
-                else:
-                    st.session_state.conversation_history.append({
-                        'role': 'assistant',
-                        'content': "I'm sorry, I couldn't process that. Could you try again?"
-                    })
+                    # Add assistant's response to history
+                    if 'text' in response and response['text']:
+                        st.session_state.conversation_history.append({
+                            'role': 'assistant',
+                            'content': response['text']
+                        })
+                        
+                        # Generate audio for the response
+                        try:
+                            audio_data = text_to_speech(
+                                response['text'],
+                                LANGUAGES[st.session_state.target_language]
+                            )
+                            # Store the audio data in session state with a unique key
+                            audio_key = f"response_audio_{len(st.session_state.conversation_history)}"
+                            st.session_state[audio_key] = audio_data
+                            # Store only the key in the conversation history
+                            st.session_state.conversation_history[-1]['audio_key'] = audio_key
+                        except Exception as e:
+                            print(f"Error generating speech: {str(e)}")
+                    else:
+                        st.session_state.conversation_history.append({
+                            'role': 'assistant',
+                            'content': "I'm sorry, I couldn't process that. Could you try again?"
+                        })
                 
                 # Move back to recording state for the next message
                 st.session_state.conversation_state = 'recording'
