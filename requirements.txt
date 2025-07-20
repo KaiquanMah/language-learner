@@ -2,6 +2,7 @@ streamlit>=1.28.0
 google-generativeai>=0.3.0 # deprecated
 python-dotenv>=1.0.0
 gtts>=2.4.0
+SpeechRecognition>=3.10.0 # to enable audio features in tab1 - play translation
 fuzzywuzzy # flexible string matching
 python-Levenshtein # Levenshtein distance for fuzzy matching
 #############################
@@ -12,7 +13,6 @@ python-Levenshtein # Levenshtein distance for fuzzy matching
 # python-dotenv
 # audio-recorder-streamlit
 # gTTS
-# SpeechRecognition>=3.10.0
 # streamlit-webrtc>=0.45.0
 # pydub>=0.25.1
 # pygame>=2.5.0
