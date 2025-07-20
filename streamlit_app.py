@@ -866,32 +866,42 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
     # Audio recording
     elif st.session_state.conversation_state == 'recording':
         st.markdown(f"### 🎤 Speak in {st.session_state.target_language}")
-        st.markdown("Click the microphone to record your message.")
         
-        # Add a back button
-        if st.button("↩️ Change Language"):
+        # Add a back button at the top
+        if st.button("← Back to Language Selection"):
             st.session_state.conversation_state = 'language_selection'
             st.rerun()
             
         st.markdown("---")
         
-        # Audio recording component
+        # Instructions for the user
+        st.markdown("1. Click the microphone button below to start recording")
+        st.markdown("2. Click it again to stop")
+        st.markdown("3. Click 'Send' to submit your recording")
+        
+        # Audio recording component with explicit height
+        st.markdown("<div style='height: 100px;'>", unsafe_allow_html=True)
         wav_audio_data = st_audiorec()
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Display the recorded audio if available
         if wav_audio_data is not None:
             st.audio(wav_audio_data, format='audio/wav')
             
-            col1, col2 = st.columns(2)
+            # Buttons in a single row
+            col1, col2 = st.columns([1, 2])
             with col1:
-                if st.button("🎤 Re-record", use_container_width=True):
+                if st.button("🔄 Re-record", use_container_width=True, type="secondary"):
                     st.session_state.audio_data = None
                     st.rerun()
             with col2:
-                if st.button("✅ Send", type="primary", use_container_width=True):
-                    st.session_state.audio_data = wav_audio_data
-                    st.session_state.conversation_state = 'processing'
-                    st.rerun()
+                if st.button("📤 Send Recording", type="primary", use_container_width=True):
+                    if wav_audio_data is not None:
+                        st.session_state.audio_data = wav_audio_data
+                        st.session_state.conversation_state = 'processing'
+                        st.rerun()
+                    else:
+                        st.warning("Please record a message first!")
     
     # processing state
     elif st.session_state.conversation_state == 'processing':
