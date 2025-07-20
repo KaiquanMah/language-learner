@@ -13,6 +13,11 @@ from dotenv import load_dotenv
 # import wave
 
 from fuzzywuzzy import fuzz
+# disable file watcher
+# workaround for the error "inotify instance limit reached"
+# which occurs when the system runs out of available file watchers
+# common in containerized environments or when running multiple Streamlit apps
+os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 
 
 
@@ -724,7 +729,8 @@ def main():
         else:
             # Show MAIN NAVIGATION TABS
             # WHEN THE PAGE LOADS INITIALLY
-            tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "🎤 Live Conversation", "📊 Progress"])
+            # tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "🎤 Live Conversation", "📊 Progress"])
+            tab1 = st.tabs(["📚 Lessons"])
 
             with tab1:
                 st.header("Choose Your Lesson")
@@ -735,6 +741,8 @@ def main():
                     # in col0 OR col1
                     with cols[idx % 2]:
                         display_lesson_card(lesson_key, lesson_data)
+            
+
 
 
     # Footer
