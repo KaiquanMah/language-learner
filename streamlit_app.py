@@ -26,6 +26,7 @@ import contextlib
 from IPython import display
 from fuzzywuzzy import fuzz
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
+from st_audiorec import st_audiorec
 
 
 
@@ -971,48 +972,25 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
     # Audio recording
     elif st.session_state.conversation_state == 'recording':
         st.markdown(f"### 🎤 Recording in {st.session_state.target_language}")
-        st.markdown("Click the button below to start speaking. Click stop when you're done.")
+        st.markdown("Click the microphone to start/stop recording. Click 'Send Recording' when you're done.")
         
         # Audio recording component
-        webrtc_ctx = webrtc_streamer(
-            key="live-audio-recording",
-            mode=WebRtcMode.SENDONLY,
-            audio_receiver_size=1024,
-            rtc_configuration={
-                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-            },
-            media_stream_constraints={
-                "audio": True,
-                "video": False
-            }
-        )
+        wav_audio_data = st_audiorec()
         
-        if st.button("Send Recording", type="primary", disabled=not webrtc_ctx.audio_receiver):
-            if webrtc_ctx.audio_receiver:
-                # Process the recorded audio
-                audio_frames = []
-                while True:
-                    try:
-                        audio_frame = webrtc_ctx.audio_receiver.get_frame(timeout=1)
-                        audio_frames.append(audio_frame.to_ndarray())
-                    except queue.Empty:
-                        break
-                
-                if audio_frames:
-                    # Combine audio frames
-                    audio_data = np.concatenate(audio_frames)
-                    st.session_state.audio_data = audio_data.tobytes()
-                    st.session_state.conversation_state = 'processing'
-                    st.rerun()
-                else:
-                    st.error("No audio was recorded. Please try again.")
+        # Display the recorded audio if available
+        if wav_audio_data is not None:
+            st.audio(wav_audio_data, format='audio/wav')
+            
+            if st.button("Send Recording", type="primary"):
+                st.session_state.audio_data = wav_audio_data
+                st.session_state.conversation_state = 'processing'
+                st.rerun()
         
-        # Fallback button if WebRTC doesn't work
-        if st.button("Use Simulated Audio (Debug)"):
-            st.session_state.audio_data = b"simulated_audio_data"
-            st.session_state.conversation_state = 'processing'
+        # Add a back button
+        if st.button("Back to Language Selection"):
+            st.session_state.conversation_state = 'language_selection'
             st.rerun()
-
+    
     # processing state
     elif st.session_state.conversation_state == 'processing':
         with st.spinner("Processing your request..."):
