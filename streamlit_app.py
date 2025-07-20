@@ -905,14 +905,16 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
     
     # processing state
     elif st.session_state.conversation_state == 'processing':
+        # Show a spinner while processing
         with st.spinner("Processing your message..."):
             try:
-                # Add user message to history
-                st.session_state.conversation_history.append({
-                    'role': 'user',
-                    'content': "🎤 [Audio message]",
-                    'audio': st.session_state.audio_data
-                })
+                # Add user message to history if not already added
+                if not st.session_state.conversation_history or st.session_state.conversation_history[-1]['role'] != 'user':
+                    st.session_state.conversation_history.append({
+                        'role': 'user',
+                        'content': "🎤 [Audio message]",
+                        'audio': st.session_state.audio_data
+                    })
                 
                 # Process the audio with Gemini
                 response = teacher.process_audio(
@@ -921,13 +923,13 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                 )
                 
                 # Add assistant's response to history
-                st.session_state.conversation_history.append({
-                    'role': 'assistant',
-                    'content': response['text']
-                })
-                
-                # Generate audio for the response if needed
                 if 'text' in response and response['text']:
+                    st.session_state.conversation_history.append({
+                        'role': 'assistant',
+                        'content': response['text']
+                    })
+                    
+                    # Generate audio for the response
                     try:
                         audio_data = text_to_speech(
                             response['text'],
@@ -936,6 +938,11 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                         st.session_state.response_audio = audio_data
                     except Exception as e:
                         print(f"Error generating speech: {str(e)}")
+                else:
+                    st.session_state.conversation_history.append({
+                        'role': 'assistant',
+                        'content': "I'm sorry, I couldn't process that. Could you try again?"
+                    })
                 
                 # Move back to recording state for the next message
                 st.session_state.conversation_state = 'recording'
@@ -943,7 +950,12 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                 st.rerun()
                 
             except Exception as e:
-                st.error(f"Error processing your message: {str(e)}")
+                error_msg = f"Error processing your message: {str(e)}"
+                print(error_msg)
+                st.session_state.conversation_history.append({
+                    'role': 'assistant',
+                    'content': "I'm sorry, I encountered an error. Please try again."
+                })
                 st.session_state.conversation_state = 'recording'
                 st.rerun()
     
