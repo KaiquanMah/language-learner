@@ -10,23 +10,9 @@ from typing import Dict, List, Optional, Tuple
 import google.generativeai as genai
 # from google import genai
 from dotenv import load_dotenv
-import dataclasses
-import numpy as np
-import wave
+# import wave
 
-# import asyncio
-from collections.abc import AsyncIterator
-import logging
-import websockets
-import queue
-import base64
-import threading
-import asyncio, taskgroup, exceptiongroup
-import contextlib
-from IPython import display
 from fuzzywuzzy import fuzz
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
-from st_audiorec import st_audiorec
 
 
 
@@ -37,9 +23,7 @@ from st_audiorec import st_audiorec
 try:
     import speech_recognition as sr
     from gtts import gTTS
-    import pygame
-    from streamlit_webrtc import webrtc_streamer, WebRtcMode
-    import av
+    # import pygame
 
     AUDIO_ENABLED = True
 except ImportError:
@@ -71,11 +55,7 @@ def init_session_state():
         st.session_state.high_contrast = False
         st.session_state.current_topic = None
         st.session_state.lesson_completed = set()
-        # for Gemini live API
-        st.session_state.audio_queue = queue.Queue()
-        st.session_state.audio_processing = False
-        st.session_state.audio_messages = []
-        st.session_state.websocket_connected = False
+
 
 
 # Curriculum structure
@@ -255,159 +235,6 @@ class GeminiLanguageTeacher:
                 "usage_notes": "Translation service temporarily unavailable. Please try again."
             }
 
-    def evaluate_pronunciation(self, user_text: str, target_text: str, language: str) -> Dict[str, any]:
-        """Evaluate user's pronunciation attempt"""
-        prompt = f"""
-        The user is learning {language} and tried to say: "{target_text}"
-        They said: "{user_text}"
-
-        Provide feedback in JSON format:
-        {{
-            "accuracy_score": 0-100,
-            "feedback": "constructive feedback",
-            "tips": ["tip1", "tip2"],
-            "encouragement": "positive message"
-        }}
-        """
-
-        try:
-            response = self.model.generate_content(prompt)
-            response_text = response.text.strip()
-
-            # Extract JSON
-            if '```json' in response_text:
-                json_str = response_text.split('```json')[1].split('```')[0].strip()
-            elif '```' in response_text:
-                json_str = response_text.split('```')[1].split('```')[0].strip()
-            else:
-                import re
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group()
-                else:
-                    json_str = response_text
-
-            result = json.loads(json_str)
-            return result
-        except Exception as e:
-            return {
-                "accuracy_score": 70,
-                "feedback": "Keep practicing!",
-                "tips": ["Try speaking more slowly", "Focus on pronunciation"],
-                "encouragement": "You're doing great!"
-            }
-
-    def generate_conversation(self, topic: str, language: str, level: str) -> Dict[str, any]:
-        """Generate a conversation scenario"""
-        prompt = f"""
-        Create a simple {level} level conversation in {language} about {topic}.
-        Include English translations.
-
-        Format as JSON:
-        {{
-            "scenario": "description of the situation",
-            "dialogue": [
-                {{"speaker": "A", "text": "...", "translation": "..."}},
-                {{"speaker": "B", "text": "...", "translation": "..."}}
-            ],
-            "vocabulary": {{"word": "translation", ...}},
-            "grammar_point": "brief explanation"
-        }}
-        """
-
-        try:
-            response = self.model.generate_content(prompt)
-            response_text = response.text.strip()
-
-            # Extract JSON
-            if '```json' in response_text:
-                json_str = response_text.split('```json')[1].split('```')[0].strip()
-            elif '```' in response_text:
-                json_str = response_text.split('```')[1].split('```')[0].strip()
-            else:
-                import re
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group()
-                else:
-                    json_str = response_text
-
-            result = json.loads(json_str)
-            return result
-        except Exception as e:
-            return {
-                "scenario": f"Practice {topic} conversation",
-                "dialogue": [
-                    {"speaker": "A", "text": "Hello", "translation": "Hello"},
-                    {"speaker": "B", "text": "Hi", "translation": "Hi"}
-                ],
-                "vocabulary": {},
-                "grammar_point": "Practice basic conversation"
-            }
-
-
-
-    # for tab3 multiturn conversation
-    def process_audio(self, audio_data: bytes, language: str) -> dict:
-        """Process audio data using Gemini API"""
-        try:
-            # Check if audio data is valid
-            if not audio_data or len(audio_data) == 0:
-                raise ValueError("No audio data provided")
-                
-            print(f"Processing audio data size: {len(audio_data)} bytes")
-            
-            # More focused prompt to get a natural response
-            prompt = f"""You are a friendly language tutor helping someone practice {language}.
-            The user just recorded a short audio message in {language}.
-            
-            Please respond naturally in {language} as if you're having a conversation.
-            - If the audio was clear, respond appropriately to what you think they said.
-            - If the audio was unclear, politely ask them to try again.
-            - Keep your response brief and conversational (1-2 sentences max).
-            - If the user asks for a translation, give the translated word or phrase in {language}. 
-            - If the user asks for a pronunciation guide, give the pronunciation guide in {language}. 
-            - If the user asks for a cultural context, give the cultural context in English. 
-            - If the user asks for an explanation of the word or phrase, give the explanation in English. 
-            - Use simple language appropriate for a language learner.
-            """
-            
-            print("Sending prompt to Gemini...")
-            
-            response = self.model.generate_content(prompt)
-            
-            # Get the response text
-            response_text = response.text.strip()
-            print(f"Received response: {response_text}")
-            
-            # Clean up the response if it contains unwanted prefixes
-            if ":" in response_text and "Option" in response_text.split(":")[0]:
-                # Remove the "Option X:" prefix if present
-                response_text = ":".join(response_text.split(":")[1:]).strip()
-            
-            # Ensure we're only returning the actual response text
-            response_lines = [line for line in response_text.split('\n') 
-                           if not line.strip().startswith('(') 
-                           and not line.strip().startswith('[')
-                           and line.strip()]
-            
-            final_response = ' '.join(response_lines).strip('"\' ')
-            
-            if not final_response:
-                final_response = f"I'm not sure what to say. Could you try that again in {language}?"
-            
-            return {
-                "text": final_response,
-                "language": language
-            }
-            
-        except Exception as e:
-            error_msg = f"Error processing audio: {str(e)}"
-            print(error_msg)
-            return {
-                "text": f"I'm sorry, I encountered an error. Could you please try again?",
-                "error": error_msg
-            }
                 
 
 
@@ -819,184 +646,6 @@ def practice_interface(teacher: GeminiLanguageTeacher):
 
 
 
-################################
-# tab3 live conversation
-################################
-def live_conversation_interface(teacher: GeminiLanguageTeacher):
-    """Multi-turn conversation interface for language learning with Gemini API integration"""
-    st.header("🎤 Interactive Language Practice")
-    st.markdown("Practice conversational language skills with an AI tutor")
-    
-    # Initialize session state for conversation
-    if 'conversation_state' not in st.session_state:
-        st.session_state.conversation_state = 'language_selection'  # States: language_selection, recording, processing, response
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    if 'target_language' not in st.session_state:
-        st.session_state.target_language = 'Hebrew'  # Default language
-    if 'audio_data' not in st.session_state:
-        st.session_state.audio_data = None
-    if 'response_audio' not in st.session_state:
-        st.session_state.response_audio = None
-    if 'last_action' not in st.session_state:
-        st.session_state.last_action = None
-    
-    # Display conversation history
-    if st.session_state.conversation_history:
-        st.markdown("### Conversation History")
-        for i, msg in enumerate(st.session_state.conversation_history):
-            role = "You" if msg['role'] == 'user' else "Tutor"
-            
-            # Display the message
-            col1, col2 = st.columns([1, 20])
-            with col1:
-                st.markdown(f"**{role}:**")
-            with col2:
-                st.markdown(msg['content'])
-            
-            # Display audio player if audio is available
-            if msg['role'] == 'assistant' and 'audio_key' in msg and msg['audio_key'] in st.session_state:
-                st.audio(st.session_state[msg['audio_key']], format='audio/mp3')
-            
-            st.markdown("---")  # Add a separator between messages
-    
-    # Language selection
-    if st.session_state.conversation_state == 'language_selection':
-        st.markdown("### Select Target Language")
-        selected_language = st.selectbox(
-            "Choose the language you want to practice:",
-            list(LANGUAGES.keys()),
-            index=list(LANGUAGES.keys()).index(st.session_state.target_language)
-        )
-        
-        if st.button("Start Conversation", type="primary"):
-            st.session_state.target_language = selected_language
-            st.session_state.conversation_state = 'recording'
-            st.session_state.conversation_history = []  # Clear previous conversation
-            st.rerun()
-
-    # Always show recording interface when in recording state
-    if st.session_state.conversation_state == 'recording':
-        st.markdown(f"### 🎤 Speak in {st.session_state.target_language}")
-        
-        # Add a back button at the top
-        if st.button("← Back to Language Selection"):
-            st.session_state.conversation_state = 'language_selection'
-            st.rerun()
-            
-        st.markdown("---")
-        
-        # Instructions for the user
-        st.markdown("1. Click the microphone button below to start recording")
-        st.markdown("2. Click it again to stop")
-        st.markdown("3. Click 'Send' to submit your recording")
-        
-        # Audio recording component with explicit height
-        st.markdown("<div style='height: 100px;'>", unsafe_allow_html=True)
-        wav_audio_data = st_audiorec()
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Display the recorded audio if available
-        if wav_audio_data is not None:
-            st.audio(wav_audio_data, format='audio/wav')
-            
-            # Buttons in a single row
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                if st.button("🔄 Re-record", use_container_width=True, type="secondary"):
-                    st.session_state.audio_data = None
-                    st.rerun()
-            with col2:
-                if st.button("📤 Send Recording", type="primary", use_container_width=True):
-                    if wav_audio_data is not None:
-                        st.session_state.audio_data = wav_audio_data
-                        st.session_state.conversation_state = 'processing'
-                        st.rerun()
-                    else:
-                        st.warning("Please record a message first!")
-    
-    # Processing state - handle the audio processing and response generation
-    if st.session_state.conversation_state == 'processing':
-        # Show a spinner while processing
-        with st.spinner("Processing your message..."):
-            try:
-                # Add user message to history if not already added
-                if not st.session_state.conversation_history or st.session_state.conversation_history[-1]['role'] != 'user':
-                    st.session_state.conversation_history.append({
-                        'role': 'user',
-                        'content': "🎤 [Audio message]"
-                    })
-                
-                # Process the audio with Gemini
-                if 'audio_data' in st.session_state and st.session_state.audio_data is not None:
-                    response = teacher.process_audio(
-                        audio_data=st.session_state.audio_data,
-                        language=st.session_state.target_language
-                    )
-                    
-                    # Add assistant's response to history
-                    if 'text' in response and response['text']:
-                        # Clear any previous assistant messages to avoid duplicates
-                        st.session_state.conversation_history = [msg for msg in st.session_state.conversation_history if msg['role'] != 'assistant']
-                        
-                        st.session_state.conversation_history.append({
-                            'role': 'assistant',
-                            'content': response['text']
-                        })
-                        
-                        # Generate audio for the response
-                        try:
-                            audio_data = text_to_speech(
-                                response['text'],
-                                LANGUAGES[st.session_state.target_language]
-                            )
-                            # Store the audio data in session state with a unique key
-                            audio_key = f"response_audio_{len(st.session_state.conversation_history)}"
-                            st.session_state[audio_key] = audio_data
-                            # Store only the key in the conversation history
-                            st.session_state.conversation_history[-1]['audio_key'] = audio_key
-                        except Exception as e:
-                            print(f"Error generating speech: {str(e)}")
-                    else:
-                        st.session_state.conversation_history.append({
-                            'role': 'assistant',
-                            'content': "I'm sorry, I couldn't process that. Could you try again?"
-                        })
-                
-                # Move back to recording state for the next message
-                st.session_state.conversation_state = 'recording'
-                st.session_state.audio_data = None
-                st.session_state.last_processed = time.time()  # Add a timestamp to force UI update
-                st.rerun()
-                
-            except Exception as e:
-                error_msg = f"Error processing your message: {str(e)}"
-                print(error_msg)
-                st.session_state.conversation_history.append({
-                    'role': 'assistant',
-                    'content': "I'm sorry, I encountered an error. Please try again."
-                })
-                st.session_state.conversation_state = 'recording'
-                st.rerun()
-    
-    # Add a button to end the conversation
-    if st.session_state.conversation_state != 'language_selection':
-        if st.button("🏁 End Conversation", type="secondary"):
-            st.session_state.conversation_state = 'language_selection'
-            st.session_state.conversation_history = []
-            st.rerun()
-    
-    # Debug information
-    if st.checkbox("Show debug info"):
-        st.write("Current state:", st.session_state.conversation_state)
-        st.write("Session state:", {k: v for k, v in st.session_state.items() if k != 'audio_data'})
-
-################################
-
-
-
-
-
 def main():
     """Main application"""
     init_session_state()
@@ -1087,58 +736,6 @@ def main():
                     with cols[idx % 2]:
                         display_lesson_card(lesson_key, lesson_data)
 
-
-            # the loop does not enter tab2
-            # maybe comment out tab2?
-            # even though original intention might be to go from the 'practice' selected in tab1
-            # to the practice in tab2
-            # the 'if block' above might be running 1st
-            with tab2:
-                st.header("🗣️ Practice Mode")
-                if st.session_state.current_topic:
-                    practice_interface(teacher)
-                else:
-                    st.info("👈 Please select a lesson from the Lessons tab first!")
-
-            with tab3:
-                live_conversation_interface(teacher)
-
-            with tab4:
-                st.header("📊 Your Progress")
-
-                # Statistics
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    st.metric("Lessons Completed",
-                              len(st.session_state.lesson_completed),
-                              f"/{len(CURRICULUM)}")
-
-                with col2:
-                    total_phrases = sum(len(lesson['phrases']) for lesson in CURRICULUM.values())
-                    st.metric("Total Phrases Available", total_phrases)
-
-                with col3:
-                    st.metric("Current Language", st.session_state.target_language)
-
-                # Completed lessons
-                st.subheader("✅ Completed Lessons")
-                if st.session_state.lesson_completed:
-                    for lesson in st.session_state.lesson_completed:
-                        if lesson in CURRICULUM:
-                            st.success(f"✓ {CURRICULUM[lesson]['title']}")
-                else:
-                    st.info("No lessons completed yet. Start learning!")
-
-                # Reset progress
-                if st.button("🔄 Reset Progress",
-                             help="Clear all progress and start fresh"):
-                    if st.checkbox("Are you sure? This will clear all your progress."):
-                        st.session_state.lesson_completed = set()
-                        st.session_state.lesson_progress = {}
-                        st.session_state.conversation_history = []
-                        st.session_state.current_topic = None
-                        st.rerun()
 
     # Footer
     st.markdown("---")
