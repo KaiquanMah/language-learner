@@ -925,50 +925,36 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
             index=list(LANGUAGES.keys()).index(st.session_state.target_language)
         )
         
-        if st.button("Continue"):
+        if st.button("Start Recording", type="primary"):
             st.session_state.target_language = selected_language
-            st.session_state.conversation_state = 'word_input'
+            st.session_state.conversation_state = 'recording'
             st.rerun()
-    
+
     # Audio recording
     elif st.session_state.conversation_state == 'recording':
-        st.markdown("### Record your voice")
-        st.markdown("Click the button below to start recording. Click again to stop.")
+        st.markdown(f"### 🎤 Recording in {st.session_state.target_language}")
+        st.markdown("Click the button below to start speaking. Click again to stop.")
         
-        if st.button("Stop Recording"):
-            # In a real implementation, this would capture audio from the microphone
+        if st.button("⏺️ Start/Stop Recording", type="primary"):
+            # In a real implementation, this would toggle audio recording
             # For now, we'll simulate it with text input
-            st.session_state.conversation_state = 'word_input'
+            st.session_state.audio_data = "[Simulated audio data]"
+            st.session_state.conversation_state = 'processing'
             st.rerun()
     
     # Processing state
     elif st.session_state.conversation_state == 'processing':
         with st.spinner("Processing your request..."):
             # Add user message to history
-            user_message = f"How do you say '{st.session_state.current_word}' in {st.session_state.target_language}?"
             st.session_state.conversation_history.append({
                 'role': 'user',
-                'content': user_message
+                'content': f"Audio recording in {st.session_state.target_language}",
+                'audio': st.session_state.audio_data
             })
             
             try:
-                # Get translation using the Gemini API
-                translation_data = teacher.get_translation(
-                    st.session_state.current_word,
-                    st.session_state.target_language
-                )
-                
-                # Format the response
-                response_text = (
-                    f"In {st.session_state.target_language}, '{st.session_state.current_word}' is: "
-                    f"{translation_data['translation']}\n\n"
-                    f"Pronunciation: {translation_data['pronunciation']}\n"
-                    f"Literal meaning: {translation_data['literal']}"
-                )
-                
-                # Add usage notes if available
-                if 'usage_notes' in translation_data and translation_data['usage_notes']:
-                    response_text += f"\n\nUsage: {translation_data['usage_notes']}"
+                # Simulate API response (replace with actual API call)
+                response_text = f"I heard you speaking {st.session_state.target_language}. How can I help you practice today?"
                 
                 # Add response to history
                 st.session_state.conversation_history.append({
@@ -979,44 +965,35 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                 # Generate audio for the response
                 try:
                     audio_data = text_to_speech(
-                        translation_data['translation'],
+                        response_text,
                         LANGUAGES[st.session_state.target_language]
                     )
                     st.session_state.response_audio = audio_data
                 except Exception as e:
                     st.error(f"Could not generate audio: {str(e)}")
-                    st.session_state.response_audio = None
                 
                 st.session_state.conversation_state = 'response'
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"Error processing your request: {str(e)}")
-                st.session_state.conversation_state = 'word_input'
+                st.session_state.conversation_state = 'recording'
                 st.rerun()
     
     # Response state
     elif st.session_state.conversation_state == 'response':
-        # Display the most recent response
-        if st.session_state.conversation_history:
-            latest_response = st.session_state.conversation_history[-1]['content']
-            st.markdown("### Response")
-            st.markdown(latest_response)
-            
-            # Play audio if available
-            if st.session_state.response_audio:
-                st.audio(st.session_state.response_audio, format='audio/mp3')
-            
-            # Continue or end conversation
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Ask Another Question"):
-                    st.session_state.conversation_state = 'word_input'
-                    st.rerun()
-            with col2:
-                if st.button("End Conversation"):
-                    st.session_state.conversation_state = 'language_selection'
-                    st.rerun()
+        # The response is already shown in the conversation history
+        # Add action buttons below the conversation
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🎤 Speak Again", use_container_width=True):
+                st.session_state.conversation_state = 'recording'
+                st.rerun()
+        with col2:
+            if st.button("🏁 End Conversation", type="secondary", use_container_width=True):
+                st.session_state.conversation_state = 'language_selection'
+                st.rerun()
+    
     
     # Debug information
     if st.checkbox("Show debug info"):
