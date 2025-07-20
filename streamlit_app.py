@@ -910,10 +910,11 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
             try:
                 # Add user message to history if not already added
                 if not st.session_state.conversation_history or st.session_state.conversation_history[-1]['role'] != 'user':
+                    # Only store a reference to the audio data, not the data itself
                     st.session_state.conversation_history.append({
                         'role': 'user',
                         'content': "🎤 [Audio message]",
-                        'audio': st.session_state.audio_data
+                        'has_audio': st.session_state.audio_data is not None
                     })
                 
                 # Process the audio with Gemini
@@ -935,7 +936,11 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                             response['text'],
                             LANGUAGES[st.session_state.target_language]
                         )
-                        st.session_state.response_audio = audio_data
+                        # Store the audio data in session state with a unique key
+                        audio_key = f"response_audio_{len(st.session_state.conversation_history)}"
+                        st.session_state[audio_key] = audio_data
+                        # Store only the key in the conversation history
+                        st.session_state.conversation_history[-1]['audio_key'] = audio_key
                     except Exception as e:
                         print(f"Error generating speech: {str(e)}")
                 else:
