@@ -357,34 +357,47 @@ class GeminiLanguageTeacher:
                 
             print(f"Processing audio data size: {len(audio_data)} bytes")
             
-            # Prepare the prompt with language context
-            prompt = f"""Please respond to this audio message in {language}. 
-            The user is practicing their {language} speaking skills. 
-            Provide a natural, conversational response in {language}.
-            If the audio is unclear or too short, ask the user to try again.
+            # More focused prompt to get a natural response
+            prompt = f"""You are a friendly language tutor helping someone practice {language}.
+            The user just recorded a short audio message in {language}.
+            
+            Please respond naturally in {language} as if you're having a conversation.
+            - If the audio was clear, respond appropriately to what you think they said.
+            - If the audio was unclear, politely ask them to try again.
+            - Keep your response brief and conversational (1-2 sentences max).
+            - If the user asks for a translation, give the translated word or phrase in {language}. 
+            - If the user asks for a pronunciation guide, give the pronunciation guide in {language}. 
+            - If the user asks for a cultural context, give the cultural context in English. 
+            - If the user asks for an explanation of the word or phrase, give the explanation in English. 
+            - Use simple language appropriate for a language learner.
             """
             
-            # For the current version of google-generativeai, we'll use text input only
-            # and include a note about the audio in the prompt
-            print("Sending text prompt to Gemini (audio processing not implemented in this version)")
+            print("Sending prompt to Gemini...")
             
-            response = self.model.generate_content(
-                prompt + "\n\n[Note: Audio processing would happen here in a future version]"
-            )
+            response = self.model.generate_content(prompt)
             
-            # Log the response for debugging
-            response_text = response.text if hasattr(response, 'text') else str(response)
-            print(f"Received response from Gemini: {response_text}")
+            # Get the response text
+            response_text = response.text.strip()
+            print(f"Received response: {response_text}")
             
-            # Check if we got a valid response
-            if not response_text or not response_text.strip():
-                return {
-                    "text": f"I'm sorry, I couldn't process that audio. Could you please try speaking again in {language}?",
-                    "error": "Empty response from API"
-                }
-                
+            # Clean up the response if it contains unwanted prefixes
+            if ":" in response_text and "Option" in response_text.split(":")[0]:
+                # Remove the "Option X:" prefix if present
+                response_text = ":".join(response_text.split(":")[1:]).strip()
+            
+            # Ensure we're only returning the actual response text
+            response_lines = [line for line in response_text.split('\n') 
+                           if not line.strip().startswith('(') 
+                           and not line.strip().startswith('[')
+                           and line.strip()]
+            
+            final_response = ' '.join(response_lines).strip('"\' ')
+            
+            if not final_response:
+                final_response = f"I'm not sure what to say. Could you try that again in {language}?"
+            
             return {
-                "text": response_text,
+                "text": final_response,
                 "language": language
             }
             
@@ -392,7 +405,7 @@ class GeminiLanguageTeacher:
             error_msg = f"Error processing audio: {str(e)}"
             print(error_msg)
             return {
-                "text": f"I'm sorry, I encountered an error processing your audio. Please try again.\n\nError details: {str(e)}",
+                "text": f"I'm sorry, I encountered an error. Could you please try again?",
                 "error": error_msg
             }
                 
