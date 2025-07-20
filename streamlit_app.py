@@ -1048,6 +1048,11 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                 
                 st.session_state.conversation_state = 'response'
                 st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error processing your request: {str(e)}")
+                st.session_state.conversation_state = 'recording'
+                st.rerun()
     
     # Response state
     elif st.session_state.conversation_state == 'response':
