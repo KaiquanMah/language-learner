@@ -12,7 +12,4 @@ SpeechRecognition>=3.10.0
 streamlit-webrtc>=0.45.0
 pydub>=0.25.1
 fuzzywuzzy # flexible string matching
-# websockets # for gemini live API
-# taskgroup  # for gemini live API
-# ipython    # explore showing audio output replays for audio2audio Gemini Live API
-streamlit-audiorec
+
