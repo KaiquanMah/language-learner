@@ -896,13 +896,19 @@ def manage_websocket_connection(target_language: str, api_key: str, audio_sessio
     """Manage WebSocket connection to Gemini Live with passed parameters"""
     logger = logging.getLogger(__name__)
     
+    # Create a local message queue if not in session state
+    if not hasattr(st.session_state, 'ws_message_queue'):
+        st.session_state.ws_message_queue = queue.Queue()
+    
     async def run_websocket():
         try:
             uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}"
             
             async with websockets.connect(uri) as websocket:
                 logger.info("WebSocket connection established")
-                st.session_state.ws_message_queue.put(('status', 'connected'))
+                # Use getattr with default to safely access session state
+                if hasattr(st.session_state, 'ws_message_queue'):
+                    st.session_state.ws_message_queue.put(('status', 'connected'))
                 
                 # Send initial configuration
                 config_message = {
@@ -916,7 +922,7 @@ def manage_websocket_connection(target_language: str, api_key: str, audio_sessio
                 }
                 await websocket.send(json.dumps(config_message))
                 
-                while st.session_state.audio_processing:
+                while getattr(st.session_state, 'audio_processing', False):
                     try:
                         # Check for audio data to send
                         if audio_session and hasattr(audio_session, 'get_audio_chunk'):
@@ -936,7 +942,7 @@ def manage_websocket_connection(target_language: str, api_key: str, audio_sessio
                             response = json.loads(message)
                             
                             # Handle different response types
-                            if 'audio' in response:
+                            if 'audio' in response and hasattr(st.session_state, 'ws_message_queue'):
                                 audio_data = base64.b64decode(response['audio']['data'])
                                 st.session_state.ws_message_queue.put(('audio', {
                                     'role': 'assistant',
@@ -948,7 +954,7 @@ def manage_websocket_connection(target_language: str, api_key: str, audio_sessio
                                 if audio_session and hasattr(audio_session, 'enqueue_audio'):
                                     await audio_session.enqueue_audio(audio_data)
                             
-                            elif 'text' in response:
+                            elif 'text' in response and hasattr(st.session_state, 'ws_message_queue'):
                                 st.session_state.ws_message_queue.put(('text', {
                                     'role': 'assistant',
                                     'text': response['text']
@@ -960,16 +966,19 @@ def manage_websocket_connection(target_language: str, api_key: str, audio_sessio
                             
                     except Exception as e:
                         logger.error(f"Error in WebSocket loop: {str(e)}", exc_info=True)
-                        st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
+                        if hasattr(st.session_state, 'ws_message_queue'):
+                            st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
                         break
                 
                 logger.info("WebSocket connection closing")
-                st.session_state.ws_message_queue.put(('status', 'disconnected'))
+                if hasattr(st.session_state, 'ws_message_queue'):
+                    st.session_state.ws_message_queue.put(('status', 'disconnected'))
                 
         except Exception as e:
             logger.error(f"WebSocket connection failed: {str(e)}", exc_info=True)
-            st.session_state.ws_message_queue.put(('error', f"Connection failed: {str(e)}"))
-            st.session_state.ws_message_queue.put(('status', 'disconnected'))
+            if hasattr(st.session_state, 'ws_message_queue'):
+                st.session_state.ws_message_queue.put(('error', f"Connection failed: {str(e)}"))
+                st.session_state.ws_message_queue.put(('status', 'disconnected'))
     
     # Create a new event loop for this thread
     loop = asyncio.new_event_loop()
@@ -979,7 +988,8 @@ def manage_websocket_connection(target_language: str, api_key: str, audio_sessio
         loop.run_until_complete(run_websocket())
     except Exception as e:
         logger.error(f"WebSocket thread error: {str(e)}", exc_info=True)
-        st.session_state.ws_message_queue.put(('error', f"Thread error: {str(e)}"))
+        if hasattr(st.session_state, 'ws_message_queue'):
+            st.session_state.ws_message_queue.put(('error', f"Thread error: {str(e)}"))
     finally:
         loop.close()
         if hasattr(st.session_state, '_ws_thread_running'):
