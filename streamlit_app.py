@@ -13,9 +13,10 @@ from dotenv import load_dotenv
 import dataclasses
 import numpy as np
 import wave
-from collections.abc import AsyncIterator
 
 # import asyncio
+from collections.abc import AsyncIterator
+import logging
 import websockets
 import queue
 import base64
