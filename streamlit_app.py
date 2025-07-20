@@ -25,6 +25,8 @@ import asyncio, taskgroup, exceptiongroup
 import contextlib
 from IPython import display
 from fuzzywuzzy import fuzz
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+
 
 
 
@@ -341,6 +343,42 @@ class GeminiLanguageTeacher:
                 "vocabulary": {},
                 "grammar_point": "Practice basic conversation"
             }
+
+
+
+    # for tab3 multiturn conversation
+    def process_audio(self, audio_data: bytes, language: str) -> dict:
+        """Process audio data using Gemini API"""
+        try:
+            # Convert audio data to base64
+            audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+        
+            # Prepare the request
+            prompt = f"Please respond to this audio message in {language}."
+        
+            response = self.model.generate_content(
+                contents=[{
+                    "text": prompt,
+                    "audio": {
+                        "mime_type": "audio/wav",
+                        "data": audio_b64
+                    }
+                }]
+            )
+        
+            return {
+                "text": response.text,
+                "audio": response.audio  # If the API returns audio
+            }
+        
+        except Exception as e:
+            raise Exception(f"Error processing audio: {str(e)}")
+
+
+
+
+        
+                
 
 def apply_custom_css():
     """Apply custom CSS for accessibility and theming"""
@@ -933,39 +971,75 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
     # Audio recording
     elif st.session_state.conversation_state == 'recording':
         st.markdown(f"### 🎤 Recording in {st.session_state.target_language}")
-        st.markdown("Click the button below to start speaking. Click again to stop.")
+        st.markdown("Click the button below to start speaking. Click stop when you're done.")
         
-        if st.button("⏺️ Start/Stop Recording", type="primary"):
-            # In a real implementation, this would toggle audio recording
-            # For now, we'll simulate it with text input
-            st.session_state.audio_data = "[Simulated audio data]"
+        # Audio recording component
+        webrtc_ctx = webrtc_streamer(
+            key="live-audio-recording",
+            mode=WebRtcMode.SENDONLY,
+            audio_receiver_size=1024,
+            rtc_configuration={
+                "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+            },
+            media_stream_constraints={
+                "audio": True,
+                "video": False
+            }
+        )
+        
+        if st.button("Send Recording", type="primary", disabled=not webrtc_ctx.audio_receiver):
+            if webrtc_ctx.audio_receiver:
+                # Process the recorded audio
+                audio_frames = []
+                while True:
+                    try:
+                        audio_frame = webrtc_ctx.audio_receiver.get_frame(timeout=1)
+                        audio_frames.append(audio_frame.to_ndarray())
+                    except queue.Empty:
+                        break
+                
+                if audio_frames:
+                    # Combine audio frames
+                    audio_data = np.concatenate(audio_frames)
+                    st.session_state.audio_data = audio_data.tobytes()
+                    st.session_state.conversation_state = 'processing'
+                    st.rerun()
+                else:
+                    st.error("No audio was recorded. Please try again.")
+        
+        # Fallback button if WebRTC doesn't work
+        if st.button("Use Simulated Audio (Debug)"):
+            st.session_state.audio_data = b"simulated_audio_data"
             st.session_state.conversation_state = 'processing'
             st.rerun()
-    
-    # Processing state
+
+    # processing state
     elif st.session_state.conversation_state == 'processing':
         with st.spinner("Processing your request..."):
-            # Add user message to history
-            st.session_state.conversation_history.append({
-                'role': 'user',
-                'content': f"Audio recording in {st.session_state.target_language}",
-                'audio': st.session_state.audio_data
-            })
-            
             try:
-                # Simulate API response (replace with actual API call)
-                response_text = f"I heard you speaking {st.session_state.target_language}. How can I help you practice today?"
+                # Add user message to history
+                st.session_state.conversation_history.append({
+                    'role': 'user',
+                    'content': "Audio message",
+                    'audio': st.session_state.audio_data
+                })
+                
+                # Send audio to Gemini API
+                response = teacher.process_audio(
+                    audio_data=st.session_state.audio_data,
+                    language=st.session_state.target_language
+                )
                 
                 # Add response to history
                 st.session_state.conversation_history.append({
                     'role': 'assistant',
-                    'content': response_text
+                    'content': response['text']
                 })
                 
                 # Generate audio for the response
                 try:
                     audio_data = text_to_speech(
-                        response_text,
+                        response['text'],
                         LANGUAGES[st.session_state.target_language]
                     )
                     st.session_state.response_audio = audio_data
@@ -973,11 +1047,6 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                     st.error(f"Could not generate audio: {str(e)}")
                 
                 st.session_state.conversation_state = 'response'
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Error processing your request: {str(e)}")
-                st.session_state.conversation_state = 'recording'
                 st.rerun()
     
     # Response state
@@ -994,7 +1063,7 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                 st.session_state.conversation_state = 'language_selection'
                 st.rerun()
     
-    
+
     # Debug information
     if st.checkbox("Show debug info"):
         st.write("Current state:", st.session_state.conversation_state)
