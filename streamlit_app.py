@@ -936,6 +936,9 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                     
                     # Add assistant's response to history
                     if 'text' in response and response['text']:
+                        # Clear any previous assistant messages to avoid duplicates
+                        st.session_state.conversation_history = [msg for msg in st.session_state.conversation_history if msg['role'] != 'assistant']
+                        
                         st.session_state.conversation_history.append({
                             'role': 'assistant',
                             'content': response['text']
@@ -963,6 +966,7 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                 # Move back to recording state for the next message
                 st.session_state.conversation_state = 'recording'
                 st.session_state.audio_data = None
+                st.session_state.last_processed = time.time()  # Add a timestamp to force UI update
                 st.rerun()
                 
             except Exception as e:
