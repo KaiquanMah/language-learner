@@ -10,6 +10,10 @@ from typing import Dict, List, Optional, Tuple
 import google.generativeai as genai
 # from google import genai
 from dotenv import load_dotenv
+import dataclasses
+import numpy as np
+import wave
+from collections.abc import AsyncIterator
 
 # import asyncio
 import websockets
@@ -20,6 +24,7 @@ import asyncio, taskgroup, exceptiongroup
 import contextlib
 from IPython import display
 from fuzzywuzzy import fuzz
+
 
 
 
@@ -744,6 +749,117 @@ def practice_interface(teacher: GeminiLanguageTeacher):
 ################################
 # tab3 live conversation
 ################################
+
+# Audio Configuration and Processing Classes
+@dataclasses.dataclass(frozen=True)
+class AudioConfig:
+    """Configuration of audio stream."""
+    sample_rate: int
+    format: str = 'S16_LE'  # only supported value
+    channels: int = 1  # only supported value
+
+    @property
+    def sample_size(self) -> int:
+        assert self.format == 'S16_LE'
+        return 2
+
+    @property
+    def frame_size(self) -> int:
+        return self.channels * self.sample_size
+
+    @property
+    def numpy_dtype(self) -> np.dtype:
+        assert self.format == 'S16_LE'
+        return np.dtype(np.int16).newbyteorder('<')
+
+@dataclasses.dataclass(frozen=True)
+class Audio:
+    """Unit of audio data with configuration."""
+    config: AudioConfig
+    data: bytes
+
+    @staticmethod
+    def silence(config: AudioConfig, length_seconds: float | int) -> 'Audio':
+        frame = b'\0' * config.frame_size
+        num_frames = int(length_seconds * config.sample_rate)
+        if num_frames < 0:
+            num_frames = 0
+        return Audio(config=config, data=frame * num_frames)
+
+    def as_numpy(self):
+        return np.frombuffer(self.data, dtype=self.config.numpy_dtype)
+
+    def as_wav_bytes(self) -> bytes:
+        buf = io.BytesIO()
+        with wave.open(buf, 'w') as wav:
+            wav.setnchannels(self.config.channels)
+            wav.setframerate(self.config.sample_rate)
+            assert self.config.format == 'S16_LE'
+            wav.setsampwidth(2)  # 16bit
+            wav.writeframes(self.data)
+        return buf.getvalue()
+
+    async def astream_realtime(
+        self, expected_delta_sec: float = 0.1
+    ) -> AsyncIterator[bytes]:
+        """Yields audio data in chunks as if it was played realtime."""
+        current_pos = 0
+        mono_start_ns = time.monotonic_ns()
+        while current_pos < len(self.data):
+            await asyncio.sleep(expected_delta_sec)
+            delta_ns = time.monotonic_ns() - mono_start_ns
+            expected_pos_frames = int(delta_ns * self.config.sample_rate / 1e9)
+            next_pos = expected_pos_frames * self.config.frame_size
+            if next_pos > current_pos:
+                yield self.data[current_pos:next_pos]
+                current_pos = next_pos
+
+    def __add__(self, other: 'Audio') -> 'Audio':
+        assert self.config == other.config
+        return Audio(config=self.config, data=self.data + other.data)
+
+class AudioSession:
+    """Connection to audio recording/playback."""
+
+    def __init__(self, config: AudioConfig):
+        self._config = config
+        self._read_queue: asyncio.Queue[bytes] = asyncio.Queue()
+        self._audio_data: bytes = b''
+        self._is_recording: bool = False
+
+    @property
+    def config(self) -> AudioConfig:
+        return self._config
+
+    def start_recording(self):
+        """Start a new recording session."""
+        self._audio_data = b''
+        self._is_recording = True
+
+    def stop_recording(self) -> bytes:
+        """Stop recording and return the recorded audio data."""
+        self._is_recording = False
+        return self._audio_data
+
+    def add_audio_data(self, data: bytes):
+        """Add audio data to the current recording."""
+        if self._is_recording:
+            self._audio_data += data
+
+    async def get_audio_chunk(self) -> Optional[bytes]:
+        """Get the next chunk of audio data, if available."""
+        if not self._read_queue.empty():
+            return await self._read_queue.get()
+        return None
+
+    async def enqueue_audio(self, audio_data: bytes):
+        """Add audio data to the playback queue."""
+        await self._read_queue.put(audio_data)
+
+# Standard audio configuration for the application
+STANDARD_AUDIO_CONFIG = AudioConfig(sample_rate=24000)
+
+
 def start_live_conversation():
     """Initialize live conversation session"""
     st.session_state.audio_processing = True
