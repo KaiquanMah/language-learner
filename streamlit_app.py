@@ -750,428 +750,278 @@ def practice_interface(teacher: GeminiLanguageTeacher):
 ################################
 # tab3 live conversation
 ################################
+# def start_live_conversation():
+#     """Initialize live conversation session"""
+#     st.session_state.audio_processing = True
+#     st.session_state.audio_messages = []
+#     st.session_state.websocket_connected = False
 
-# Audio Configuration and Processing Classes
-@dataclasses.dataclass(frozen=True)
-class AudioConfig:
-    """Configuration of audio stream."""
-    sample_rate: int
-    format: str = 'S16_LE'  # only supported value
-    channels: int = 1  # only supported value
+# def stop_live_conversation():
+#     """Stop live conversation session"""
+#     st.session_state.audio_processing = False
+#     st.session_state.websocket_connected = False
 
-    @property
-    def sample_size(self) -> int:
-        assert self.format == 'S16_LE'
-        return 2
-
-    @property
-    def frame_size(self) -> int:
-        return self.channels * self.sample_size
-
-    @property
-    def numpy_dtype(self) -> np.dtype:
-        assert self.format == 'S16_LE'
-        return np.dtype(np.int16).newbyteorder('<')
-
-@dataclasses.dataclass(frozen=True)
-class Audio:
-    """Unit of audio data with configuration."""
-    config: AudioConfig
-    data: bytes
-
-    @staticmethod
-    def silence(config: AudioConfig, length_seconds: float | int) -> 'Audio':
-        frame = b'\0' * config.frame_size
-        num_frames = int(length_seconds * config.sample_rate)
-        if num_frames < 0:
-            num_frames = 0
-        return Audio(config=config, data=frame * num_frames)
-
-    def as_numpy(self):
-        return np.frombuffer(self.data, dtype=self.config.numpy_dtype)
-
-    def as_wav_bytes(self) -> bytes:
-        buf = io.BytesIO()
-        with wave.open(buf, 'w') as wav:
-            wav.setnchannels(self.config.channels)
-            wav.setframerate(self.config.sample_rate)
-            assert self.config.format == 'S16_LE'
-            wav.setsampwidth(2)  # 16bit
-            wav.writeframes(self.data)
-        return buf.getvalue()
-
-    async def astream_realtime(
-        self, expected_delta_sec: float = 0.1
-    ) -> AsyncIterator[bytes]:
-        """Yields audio data in chunks as if it was played realtime."""
-        current_pos = 0
-        mono_start_ns = time.monotonic_ns()
-        while current_pos < len(self.data):
-            await asyncio.sleep(expected_delta_sec)
-            delta_ns = time.monotonic_ns() - mono_start_ns
-            expected_pos_frames = int(delta_ns * self.config.sample_rate / 1e9)
-            next_pos = expected_pos_frames * self.config.frame_size
-            if next_pos > current_pos:
-                yield self.data[current_pos:next_pos]
-                current_pos = next_pos
-
-    def __add__(self, other: 'Audio') -> 'Audio':
-        assert self.config == other.config
-        return Audio(config=self.config, data=self.data + other.data)
-
-class AudioSession:
-    """Connection to audio recording/playback."""
-
-    def __init__(self, config: AudioConfig):
-        self._config = config
-        self._read_queue: asyncio.Queue[bytes] = asyncio.Queue()
-        self._audio_data: bytes = b''
-        self._is_recording: bool = False
-
-    @property
-    def config(self) -> AudioConfig:
-        return self._config
-
-    def start_recording(self):
-        """Start a new recording session."""
-        self._audio_data = b''
-        self._is_recording = True
-
-    def stop_recording(self) -> bytes:
-        """Stop recording and return the recorded audio data."""
-        self._is_recording = False
-        return self._audio_data
-
-    def add_audio_data(self, data: bytes):
-        """Add audio data to the current recording."""
-        if self._is_recording:
-            self._audio_data += data
-
-    async def get_audio_chunk(self) -> Optional[bytes]:
-        """Get the next chunk of audio data, if available."""
-        if not self._read_queue.empty():
-            return await self._read_queue.get()
-        return None
-
-    async def enqueue_audio(self, audio_data: bytes):
-        """Add audio data to the playback queue."""
-        await self._read_queue.put(audio_data)
-
-# Standard audio configuration for the application
-STANDARD_AUDIO_CONFIG = AudioConfig(sample_rate=24000)
-
-
-def start_live_conversation():
-    """Initialize live conversation session"""
-    st.session_state.audio_processing = True
-    st.session_state.audio_messages = []
-    st.session_state.websocket_connected = False
-
-def stop_live_conversation():
-    """Stop live conversation session"""
-    st.session_state.audio_processing = False
-    st.session_state.websocket_connected = False
-
-def display_conversation_bubbles():
-    """Display conversation messages in chat bubbles"""
-    for msg in st.session_state.audio_messages:
-        if msg['role'] == 'user':
-            st.markdown(f"""
-                <div class="conversation-bubble user-bubble">
-                    <strong>You:</strong> {msg['text']}
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-                <div class="conversation-bubble bot-bubble">
-                    <strong>Bot:</strong> {msg['text']}
-                </div>
-            """, unsafe_allow_html=True)
+# def display_conversation_bubbles():
+#     """Display conversation messages in chat bubbles"""
+#     for msg in st.session_state.audio_messages:
+#         if msg['role'] == 'user':
+#             st.markdown(f"""
+#                 <div class="conversation-bubble user-bubble">
+#                     <strong>You:</strong> {msg['text']}
+#                 </div>
+#             """, unsafe_allow_html=True)
+#         else:
+#             st.markdown(f"""
+#                 <div class="conversation-bubble bot-bubble">
+#                     <strong>Bot:</strong> {msg['text']}
+#                 </div>
+#             """, unsafe_allow_html=True)
             
-            # Play audio if available
-            if 'audio' in msg and msg['audio'] is not None:
-                st.audio(msg['audio'], format='audio/mp3')
+#             # Play audio if available
+#             if 'audio' in msg and msg['audio'] is not None:
+#                 st.audio(msg['audio'], format='audio/mp3')
 
-def manage_websocket_connection(target_language: str, api_key: str, audio_session):
-    """Manage WebSocket connection to Gemini Live with passed parameters"""
-    logger = logging.getLogger(__name__)
+# def manage_websocket_connection(target_language: str, api_key: str, audio_session):
+#     """Manage WebSocket connection to Gemini Live with passed parameters"""
+#     logger = logging.getLogger(__name__)
     
-    # Create a local message queue if not in session state
-    if not hasattr(st.session_state, 'ws_message_queue'):
-        st.session_state.ws_message_queue = queue.Queue()
+#     # Create a local message queue if not in session state
+#     if not hasattr(st.session_state, 'ws_message_queue'):
+#         st.session_state.ws_message_queue = queue.Queue()
     
-    async def run_websocket():
-        try:
-            uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}"
+#     async def run_websocket():
+#         try:
+#             uri = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={api_key}"
             
-            async with websockets.connect(uri) as websocket:
-                logger.info("WebSocket connection established")
-                # Use getattr with default to safely access session state
-                if hasattr(st.session_state, 'ws_message_queue'):
-                    st.session_state.ws_message_queue.put(('status', 'connected'))
+#             async with websockets.connect(uri) as websocket:
+#                 logger.info("WebSocket connection established")
+#                 # Use getattr with default to safely access session state
+#                 if hasattr(st.session_state, 'ws_message_queue'):
+#                     st.session_state.ws_message_queue.put(('status', 'connected'))
                 
-                # Send initial configuration
-                config_message = {
-                    "config": {
-                        "model": "models/gemini-live-2.5-flash-preview",
-                        "generation_config": {
-                            "language_code": target_language.split("-")[0],
-                            "response_mime_type": "audio/wav"
-                        }
-                    }
-                }
-                await websocket.send(json.dumps(config_message))
+#                 # Send initial configuration
+#                 config_message = {
+#                     "config": {
+#                         "model": "models/gemini-live-2.5-flash-preview",
+#                         "generation_config": {
+#                             "language_code": target_language.split("-")[0],
+#                             "response_mime_type": "audio/wav"
+#                         }
+#                     }
+#                 }
+#                 await websocket.send(json.dumps(config_message))
                 
-                while getattr(st.session_state, 'audio_processing', False):
-                    try:
-                        # Check for audio data to send
-                        if audio_session and hasattr(audio_session, 'get_audio_chunk'):
-                            audio_chunk = await audio_session.get_audio_chunk()
-                            if audio_chunk:
-                                audio_message = {
-                                    "audio": {
-                                        "data": base64.b64encode(audio_chunk).decode('utf-8'),
-                                        "mime_type": "audio/wav"
-                                    }
-                                }
-                                await websocket.send(json.dumps(audio_message))
+#                 while getattr(st.session_state, 'audio_processing', False):
+#                     try:
+#                         # Check for audio data to send
+#                         if audio_session and hasattr(audio_session, 'get_audio_chunk'):
+#                             audio_chunk = await audio_session.get_audio_chunk()
+#                             if audio_chunk:
+#                                 audio_message = {
+#                                     "audio": {
+#                                         "data": base64.b64encode(audio_chunk).decode('utf-8'),
+#                                         "mime_type": "audio/wav"
+#                                     }
+#                                 }
+#                                 await websocket.send(json.dumps(audio_message))
                         
-                        # Receive messages with timeout
-                        try:
-                            message = await asyncio.wait_for(websocket.recv(), timeout=0.1)
-                            response = json.loads(message)
+#                         # Receive messages with timeout
+#                         try:
+#                             message = await asyncio.wait_for(websocket.recv(), timeout=0.1)
+#                             response = json.loads(message)
                             
-                            # Handle different response types
-                            if 'audio' in response and hasattr(st.session_state, 'ws_message_queue'):
-                                audio_data = base64.b64decode(response['audio']['data'])
-                                st.session_state.ws_message_queue.put(('audio', {
-                                    'role': 'assistant',
-                                    'text': response.get('text', ''),
-                                    'audio': audio_data
-                                }))
+#                             # Handle different response types
+#                             if 'audio' in response and hasattr(st.session_state, 'ws_message_queue'):
+#                                 audio_data = base64.b64decode(response['audio']['data'])
+#                                 st.session_state.ws_message_queue.put(('audio', {
+#                                     'role': 'assistant',
+#                                     'text': response.get('text', ''),
+#                                     'audio': audio_data
+#                                 }))
                                 
-                                # Add to playback queue
-                                if audio_session and hasattr(audio_session, 'enqueue_audio'):
-                                    await audio_session.enqueue_audio(audio_data)
+#                                 # Add to playback queue
+#                                 if audio_session and hasattr(audio_session, 'enqueue_audio'):
+#                                     await audio_session.enqueue_audio(audio_data)
                             
-                            elif 'text' in response and hasattr(st.session_state, 'ws_message_queue'):
-                                st.session_state.ws_message_queue.put(('text', {
-                                    'role': 'assistant',
-                                    'text': response['text']
-                                }))
+#                             elif 'text' in response and hasattr(st.session_state, 'ws_message_queue'):
+#                                 st.session_state.ws_message_queue.put(('text', {
+#                                     'role': 'assistant',
+#                                     'text': response['text']
+#                                 }))
                             
-                        except asyncio.TimeoutError:
-                            # No message received, continue the loop
-                            continue
+#                         except asyncio.TimeoutError:
+#                             # No message received, continue the loop
+#                             continue
                             
-                    except Exception as e:
-                        logger.error(f"Error in WebSocket loop: {str(e)}", exc_info=True)
-                        if hasattr(st.session_state, 'ws_message_queue'):
-                            st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
-                        break
+#                     except Exception as e:
+#                         logger.error(f"Error in WebSocket loop: {str(e)}", exc_info=True)
+#                         if hasattr(st.session_state, 'ws_message_queue'):
+#                             st.session_state.ws_message_queue.put(('error', f"WebSocket error: {str(e)}"))
+#                         break
                 
-                logger.info("WebSocket connection closing")
-                if hasattr(st.session_state, 'ws_message_queue'):
-                    st.session_state.ws_message_queue.put(('status', 'disconnected'))
+#                 logger.info("WebSocket connection closing")
+#                 if hasattr(st.session_state, 'ws_message_queue'):
+#                     st.session_state.ws_message_queue.put(('status', 'disconnected'))
                 
-        except Exception as e:
-            logger.error(f"WebSocket connection failed: {str(e)}", exc_info=True)
-            if hasattr(st.session_state, 'ws_message_queue'):
-                st.session_state.ws_message_queue.put(('error', f"Connection failed: {str(e)}"))
-                st.session_state.ws_message_queue.put(('status', 'disconnected'))
+#         except Exception as e:
+#             logger.error(f"WebSocket connection failed: {str(e)}", exc_info=True)
+#             if hasattr(st.session_state, 'ws_message_queue'):
+#                 st.session_state.ws_message_queue.put(('error', f"Connection failed: {str(e)}"))
+#                 st.session_state.ws_message_queue.put(('status', 'disconnected'))
     
-    # Create a new event loop for this thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+#     # Create a new event loop for this thread
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
     
-    try:
-        loop.run_until_complete(run_websocket())
-    except Exception as e:
-        logger.error(f"WebSocket thread error: {str(e)}", exc_info=True)
-        if hasattr(st.session_state, 'ws_message_queue'):
-            st.session_state.ws_message_queue.put(('error', f"Thread error: {str(e)}"))
-    finally:
-        loop.close()
-        if hasattr(st.session_state, '_ws_thread_running'):
-            del st.session_state._ws_thread_running
+#     try:
+#         loop.run_until_complete(run_websocket())
+#     except Exception as e:
+#         error_msg = f"WebSocket thread error: {str(e)}"
+#         logger.error(error_msg, exc_info=True)
+#         if hasattr(st.session_state, 'ws_message_queue'):
+#             st.session_state.ws_message_queue.put(('error', error_msg))
+#         st.session_state.audio_processing = False
+#         if hasattr(st.session_state, '_ws_thread_running'):
+#             del st.session_state._ws_thread_running
+#         st.rerun()
+    
+#     # Clean up thread state when stopping
+#     if not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
+#         if hasattr(st.session_state, '_ws_thread_running'):
+#             del st.session_state._ws_thread_running
 
-def live_conversation_interface():
-    """Real-time conversation with Gemini Live"""
-    import logging
-    logger = logging.getLogger(__name__)
+def live_conversation_interface(teacher: GeminiLanguageTeacher):
+    """Multi-turn conversation interface for language learning with Gemini API integration"""
+    st.header("🎤 Interactive Language Practice")
+    st.markdown("Practice conversational language skills with an AI tutor")
     
-    st.header("🎤 Real-time Conversation")
-    st.markdown("Practice speaking with an AI tutor in real-time using your microphone")
+    # Initialize session state for conversation
+    if 'conversation_state' not in st.session_state:
+        st.session_state.conversation_state = 'language_selection'  # States: language_selection, word_input, recording, processing, response
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+    if 'target_language' not in st.session_state:
+        st.session_state.target_language = 'Hebrew'  # Default language
+    if 'current_word' not in st.session_state:
+        st.session_state.current_word = ''
+    if 'audio_data' not in st.session_state:
+        st.session_state.audio_data = None
+    if 'response_audio' not in st.session_state:
+        st.session_state.response_audio = None
     
-    # Initialize session state variables
-    if 'audio_messages' not in st.session_state:
-        st.session_state.audio_messages = []
-    if 'audio_processing' not in st.session_state:
-        st.session_state.audio_processing = False
-    if 'websocket_connected' not in st.session_state:
-        st.session_state.websocket_connected = False
-    if 'ws_message_queue' not in st.session_state:
-        st.session_state.ws_message_queue = queue.Queue()
-    if 'audio_session' not in st.session_state:
-        st.session_state.audio_session = AudioSession(STANDARD_AUDIO_CONFIG)
-    if 'is_recording' not in st.session_state:
-        st.session_state.is_recording = False
+    # Display conversation history
+    if st.session_state.conversation_history:
+        st.markdown("### Conversation History")
+        for msg in st.session_state.conversation_history:
+            role = "You" if msg['role'] == 'user' else "Tutor"
+            st.markdown(f"**{role}**: {msg['content']}")
     
-    # Process messages from WebSocket thread
-    if hasattr(st.session_state, 'ws_message_queue'):
-        try:
-            while not st.session_state.ws_message_queue.empty():
-                msg_type, content = st.session_state.ws_message_queue.get()
-                
-                if msg_type == 'log':
-                    logger.info(f"[UI] {content}")
-                    st.toast(content, icon="ℹ️")
-                elif msg_type == 'status':
-                    logger.info(f"[STATUS] {content}")
-                    st.session_state.websocket_connected = (content == 'connected')
-                    if content == 'connected':
-                        st.toast("Connected to Gemini Live API", icon="✅")
-                    else:
-                        st.toast("Disconnected from Gemini Live API", icon="ℹ️")
-                elif msg_type in ['audio', 'text']:
-                    st.session_state.audio_messages.append(content)
-                    st.rerun()  # Refresh to show new message
-                elif msg_type == 'error':
-                    logger.error(f"[ERROR] {content}")
-                    st.toast(f"Error: {content}", icon="❌")
-        except Exception as e:
-            logger.error(f"Error processing message queue: {str(e)}")
-    
-    # Create layout columns
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        # Display conversation history
-        st.subheader("Conversation")
-        conversation_container = st.container()
+    # Language selection
+    if st.session_state.conversation_state == 'language_selection':
+        st.markdown("### Select Target Language")
+        selected_language = st.selectbox(
+            "Choose the language you want to practice:",
+            list(LANGUAGES.keys()),
+            index=list(LANGUAGES.keys()).index(st.session_state.target_language)
+        )
         
-        with conversation_container:
-            display_conversation_bubbles()
-    
-    with col2:
-        # Status panel
-        st.subheader("Status")
-        
-        # Connection status
-        status_placeholder = st.empty()
-        
-        # Recording status
-        recording_placeholder = st.empty()
-        
-        # Control buttons
-        control_placeholder = st.empty()
-    
-    # Update status indicators
-    if st.session_state.websocket_connected:
-        status_placeholder.success("✅ Connected to Gemini Live")
-    else:
-        status_placeholder.warning("❌ Disconnected")
-    
-    if st.session_state.is_recording:
-        recording_placeholder.warning("🎙️ Recording...")
-    else:
-        recording_placeholder.info("🎤 Ready to record")
-    
-    # Control buttons
-    if not st.session_state.audio_processing:
-        if st.button("🎤 Start Conversation", use_container_width=True, key="start_conversation"):
-            st.session_state.audio_processing = True
-            st.session_state.websocket_connected = False
-            st.session_state.audio_messages = []
-            st.session_state.audio_session = AudioSession(STANDARD_AUDIO_CONFIG)
+        if st.button("Continue"):
+            st.session_state.target_language = selected_language
+            st.session_state.conversation_state = 'word_input'
             st.rerun()
-    else:
-        # Create a container for the recording controls
-        with control_placeholder.container():
-            col1, col2 = st.columns(2)
+    
+    # Audio recording
+    elif st.session_state.conversation_state == 'recording':
+        st.markdown("### Record your voice")
+        st.markdown("Click the button below to start recording. Click again to stop.")
+        
+        if st.button("Stop Recording"):
+            # In a real implementation, this would capture audio from the microphone
+            # For now, we'll simulate it with text input
+            st.session_state.conversation_state = 'word_input'
+            st.rerun()
+    
+    # Processing state
+    elif st.session_state.conversation_state == 'processing':
+        with st.spinner("Processing your request..."):
+            # Add user message to history
+            user_message = f"How do you say '{st.session_state.current_word}' in {st.session_state.target_language}?"
+            st.session_state.conversation_history.append({
+                'role': 'user',
+                'content': user_message
+            })
             
-            with col1:
-                if st.button("�️ Start Recording", 
-                           disabled=st.session_state.is_recording,
-                           use_container_width=True):
-                    st.session_state.audio_session.start_recording()
-                    st.session_state.is_recording = True
-                    st.rerun()
-            
-            with col2:
-                if st.button("⏹️ Stop Recording",
-                           disabled=not st.session_state.is_recording,
-                           use_container_width=True):
-                    audio_data = st.session_state.audio_session.stop_recording()
-                    st.session_state.is_recording = False
-                    # Process the recorded audio here if needed
-                    st.rerun()
-            
-            if st.button("🛑 End Conversation", 
-                        type="primary",
-                        use_container_width=True):
-                st.session_state.audio_processing = False
-                st.session_state.websocket_connected = False
-                st.session_state.is_recording = False
+            try:
+                # Get translation using the Gemini API
+                translation_data = teacher.get_translation(
+                    st.session_state.current_word,
+                    st.session_state.target_language
+                )
+                
+                # Format the response
+                response_text = (
+                    f"In {st.session_state.target_language}, '{st.session_state.current_word}' is: "
+                    f"{translation_data['translation']}\n\n"
+                    f"Pronunciation: {translation_data['pronunciation']}\n"
+                    f"Literal meaning: {translation_data['literal']}"
+                )
+                
+                # Add usage notes if available
+                if 'usage_notes' in translation_data and translation_data['usage_notes']:
+                    response_text += f"\n\nUsage: {translation_data['usage_notes']}"
+                
+                # Add response to history
+                st.session_state.conversation_history.append({
+                    'role': 'assistant',
+                    'content': response_text
+                })
+                
+                # Generate audio for the response
+                try:
+                    audio_data = text_to_speech(
+                        translation_data['translation'],
+                        LANGUAGES[st.session_state.target_language]
+                    )
+                    st.session_state.response_audio = audio_data
+                except Exception as e:
+                    st.error(f"Could not generate audio: {str(e)}")
+                    st.session_state.response_audio = None
+                
+                st.session_state.conversation_state = 'response'
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error processing your request: {str(e)}")
+                st.session_state.conversation_state = 'word_input'
                 st.rerun()
     
-    # Start WebSocket connection if needed
-    if (st.session_state.audio_processing and 
-        not st.session_state.websocket_connected and
-        not hasattr(st.session_state, '_ws_thread_running')):
-        
-        # Get values before starting thread
-        target_language = st.session_state.target_language
-        api_key = os.getenv('GEMINI_API_KEY', '')
-        
-        if not api_key:
-            st.error("Gemini API key not found. Please set the GEMINI_API_KEY environment variable.")
-            st.session_state.audio_processing = False
-            st.rerun()
-            return
-        
-        # Initialize thread state
-        st.session_state._ws_thread_running = True
-        
-        try:
-            # Start WebSocket connection in a separate thread
-            thread = threading.Thread(
-                target=manage_websocket_connection,
-                args=(target_language, api_key, st.session_state.audio_session),
-                daemon=True,
-                name="GeminiWebSocketThread"
-            )
+    # Response state
+    elif st.session_state.conversation_state == 'response':
+        # Display the most recent response
+        if st.session_state.conversation_history:
+            latest_response = st.session_state.conversation_history[-1]['content']
+            st.markdown("### Response")
+            st.markdown(latest_response)
             
-            def thread_exception_handler(args):
-                logger.error(f"Thread {thread.name} failed: {args.exc_value}", exc_info=args.exc_info)
-                st.session_state.ws_message_queue.put(('error', f"Thread error: {str(args.exc_value)}"))
-                if hasattr(st.session_state, '_ws_thread_running'):
-                    del st.session_state._ws_thread_running
+            # Play audio if available
+            if st.session_state.response_audio:
+                st.audio(st.session_state.response_audio, format='audio/mp3')
             
-            thread._exc_info = None
-            thread._exception_handler = thread_exception_handler
-            
-            thread.start()
-            
-            # Verify thread is alive
-            if not thread.is_alive():
-                raise RuntimeError("Failed to start WebSocket thread")
-                
-            logger.info(f"WebSocket thread started successfully: {thread.name} (ID: {thread.ident})")
-            
-        except Exception as e:
-            error_msg = f"Failed to start WebSocket thread: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            st.session_state.ws_message_queue.put(('error', error_msg))
-            st.session_state.audio_processing = False
-            if hasattr(st.session_state, '_ws_thread_running'):
-                del st.session_state._ws_thread_running
-            st.rerun()
+            # Continue or end conversation
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Ask Another Question"):
+                    st.session_state.conversation_state = 'word_input'
+                    st.rerun()
+            with col2:
+                if st.button("End Conversation"):
+                    st.session_state.conversation_state = 'language_selection'
+                    st.rerun()
     
-    # Clean up thread state when stopping
-    if not st.session_state.audio_processing and hasattr(st.session_state, '_ws_thread_running'):
-        if hasattr(st.session_state, '_ws_thread_running'):
-            del st.session_state._ws_thread_running
+    # Debug information
+    if st.checkbox("Show debug info"):
+        st.write("Current state:", st.session_state.conversation_state)
+        st.write("Session state:", {k: v for k, v in st.session_state.items() if k != 'audio_data'})
 
 ################################
 
@@ -1283,7 +1133,7 @@ def main():
                     st.info("👈 Please select a lesson from the Lessons tab first!")
 
             with tab3:
-                live_conversation_interface()
+                live_conversation_interface(teacher)
 
             with tab4:
                 st.header("📊 Your Progress")
