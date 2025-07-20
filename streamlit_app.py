@@ -915,8 +915,8 @@ def live_conversation_interface(teacher: GeminiLanguageTeacher):
                     else:
                         st.warning("Please record a message first!")
     
-    # processing state
-    elif st.session_state.conversation_state == 'processing':
+    # Processing state - handle the audio processing and response generation
+    if st.session_state.conversation_state == 'processing':
         # Show a spinner while processing
         with st.spinner("Processing your message..."):
             try:
