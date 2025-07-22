@@ -1,36 +1,37 @@
 import streamlit as st
 import os
+from datetime import datetime
 import json
+import base64
 import io
+import time
 import re
-from dotenv import load_dotenv
-# from datetime import datetime
-# import base64
-# import time
 from typing import Dict, List, Optional, Tuple
 import google.generativeai as genai
-# from google import genai
-
+from dotenv import load_dotenv
+import tempfile
+import numpy as np
 from fuzzywuzzy import fuzz
-# disable file watcher
-# workaround for the error "inotify instance limit reached"
-# which occurs when the system runs out of available file watchers
-# common in containerized environments or when running multiple Streamlit apps
-os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
+import pyaudio
 
-
-
-
-
-
-# Optional audio imports - comment out if causing issues
+# Optional audio imports
 try:
     import speech_recognition as sr
     from gtts import gTTS
+    from audio_recorder_streamlit import audio_recorder
 
     AUDIO_ENABLED = True
+    RECORDER_AVAILABLE = True
 except ImportError:
     AUDIO_ENABLED = False
+    RECORDER_AVAILABLE = False
+    try:
+        import speech_recognition as sr
+        from gtts import gTTS
+
+        AUDIO_ENABLED = True
+    except ImportError:
+        pass
 
 # Load environment variables
 load_dotenv()
@@ -58,123 +59,77 @@ def init_session_state():
         st.session_state.high_contrast = False
         st.session_state.current_topic = None
         st.session_state.lesson_completed = set()
-
+        st.session_state.last_recording = None
 
 
 # Curriculum structure
 CURRICULUM = {
     'greetings': {
-        'title': 'Basic Greetings',
+        'title': '👋 Basic Greetings',
         'description': 'Learn how to say hello, goodbye, and introduce yourself',
         'phrases': [
-            'Hello', 
-            'Good morning', 
-            'Good afternoon', 
-            'Good evening',
-            'How are you?', 
-            'I am fine, thank you', 
-            'What is your name?',
-            'My name is...', 
-            'Nice to meet you', 
-            'Goodbye'
+            'Hello', 'Good morning', 'Good afternoon', 'Good evening',
+            'How are you?', 'I am fine, thank you', 'What is your name?',
+            'My name is...', 'Nice to meet you', 'Goodbye'
         ],
         'difficulty': 'beginner'
     },
     'numbers': {
-        'title': 'Numbers 1-20',
+        'title': '🔢 Numbers 1-20',
         'description': 'Learn to count from 1 to 20',
-        'phrases': ['One', 
-                    'Two', 
-                    'Three', 
-                    'Four', 
-                    'Five', 
-                    'Six', 
-                    'Seven',
-                    'Eight', 
-                    'Nine', 
-                    'Ten', 
-                    'Eleven', 
-                    'Twelve', 
-                    'Thirteen',
-                    'Fourteen', 
-                    'Fifteen', 
-                    'Sixteen', 
-                    'Seventeen', 
-                    'Eighteen',
-                    'Nineteen', 
-                    'Twenty'],
+        'phrases': ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven',
+                    'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
+                    'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen',
+                    'Nineteen', 'Twenty'],
         'difficulty': 'beginner'
     },
     'daily_phrases': {
-        'title': 'Daily Phrases',
+        'title': '💬 Daily Phrases',
         'description': 'Common phrases for everyday situations',
         'phrases': [
-            'Please', 
-            'Thank you', 
-            'You are welcome', 
-            'Excuse me',
-            'I am sorry', 
-            'Can you help me?', 
-            'Where is the bathroom?',
-            'How much does this cost?', 
-            'I do not understand',
+            'Please', 'Thank you', 'You are welcome', 'Excuse me',
+            'I am sorry', 'Can you help me?', 'Where is the bathroom?',
+            'How much does this cost?', 'I do not understand',
             'Can you speak slower?'
         ],
         'difficulty': 'beginner'
     },
     'food_drink': {
-        'title': 'Food & Drink',
+        'title': '🍽️ Food & Drink',
         'description': 'Essential vocabulary for restaurants and cafes',
         'phrases': [
-            'I would like...', 
-            'Water, please', 
-            'Coffee', 
-            'Tea',
-            'The menu, please', 
-            'The bill, please', 
-            'Is this vegetarian?',
-            'I am allergic to...', 
-            'Delicious!', 
-            'More, please'
+            'I would like...', 'Water, please', 'Coffee', 'Tea',
+            'The menu, please', 'The bill, please', 'Is this vegetarian?',
+            'I am allergic to...', 'Delicious!', 'More, please'
         ],
         'difficulty': 'intermediate'
     },
     'directions': {
-        'title': 'Directions',
+        'title': '🗺️ Directions',
         'description': 'Ask for and understand directions',
         'phrases': [
-            'Where is...?', 
-            'Turn left', 
-            'Turn right', 
-            'Go straight',
-            'Near', 
-            'Far', 
-            'Next to', 
-            'Behind', 
-            'In front of',
+            'Where is...?', 'Turn left', 'Turn right', 'Go straight',
+            'Near', 'Far', 'Next to', 'Behind', 'In front of',
             'How do I get to...?'
         ],
         'difficulty': 'intermediate'
     }
 }
 
-# Language options
+# Language options with full names and codes
 LANGUAGES = {
-    'Hebrew': 'iw', # 2025.07.17 fix language code
-    'Finnish': 'fi',
-    'French': 'fr',
+    'Hebrew': "he-IL",  # 2025.07.17 fix language code
+    'Spanish': 'es-ES',
+    'French': '	fr-FR',
     'German': 'de',
-    'Spanish': 'es',
-    'Italian': 'it',
+    'Italian': 'it-IT',
     'Portuguese': 'pt',
     'Japanese': 'ja',
     'Korean': 'ko',
+    'Chinese (Mandarin)': 'zh-CN',
     'Hindi': 'hi',
-    'Arabic': 'ar',
-    'Bahasa Melayu': 'ms',
-    'Chinese (Mandarin)': 'zh'
+    'Arabic': 'ar'
 }
-
 
 
 class GeminiLanguageTeacher:
@@ -183,9 +138,8 @@ class GeminiLanguageTeacher:
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
         # Use gemini-1.5-flash which is the current model
-        # self.model = genai.GenerativeModel('gemini-1.5-flash') # 50 requests per day
-        self.model = genai.GenerativeModel('gemma-3-27b-it') # 14.4k requests per day
-
+        # self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemma-3-27b-it')  # 14.4k requests per day
 
     def get_translation(self, text: str, target_language: str) -> Dict[str, str]:
         """Get translation and pronunciation guide"""
@@ -219,7 +173,6 @@ class GeminiLanguageTeacher:
                 json_str = response_text.split('```')[1].split('```')[0].strip()
             else:
                 # Try to find JSON pattern
-                import re
                 json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
                 if json_match:
                     json_str = json_match.group()
@@ -238,11 +191,51 @@ class GeminiLanguageTeacher:
                 "usage_notes": "Translation service temporarily unavailable. Please try again."
             }
 
-                
+    def evaluate_pronunciation(self, user_text: str, target_text: str, language: str) -> Dict[str, any]:
+        """Evaluate user's pronunciation attempt"""
+        prompt = f"""
+        The user is learning {language} and tried to say: "{target_text}"
+        They said: "{user_text}"
 
+        Provide feedback in JSON format:
+        {{
+            "accuracy_score": 0-100,
+            "feedback": "constructive feedback",
+            "tips": ["tip1", "tip2"],
+            "encouragement": "positive message"
+        }}
+        """
 
-        
-                
+        try:
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # Extract JSON
+            if '```json' in response_text:
+                json_str = response_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in response_text:
+                json_str = response_text.split('```')[1].split('```')[0].strip()
+            else:
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group()
+                else:
+                    json_str = response_text
+
+            result = json.loads(json_str)
+            return result
+        except Exception as e:
+            # Simple comparison fallback
+            similarity_ex = fuzz.ratio(user_text.lower(), target_text)
+            # similarity = len(set(user_text.lower().split()) & set(target_text.lower().split())) / max(
+            #     len(target_text.split()), 1) * 100
+            return {
+                "accuracy_score": int(similarity_ex),
+                "feedback": "Keep practicing!" if similarity_ex < 70 else "Good job!",
+                "tips": ["Try speaking more slowly", "Focus on each syllable"],
+                "encouragement": "You're making progress!"
+            }
+
 
 def apply_custom_css():
     """Apply custom CSS for accessibility and theming"""
@@ -345,12 +338,13 @@ def apply_custom_css():
         font-weight: bold;
     }}
 
-    /* Audio player styling */
-    .audio-controls {{
-        display: flex;
-        gap: 15px;
-        align-items: center;
-        margin: 20px 0;
+    /* Audio recorder styling */
+    .audio-recorder {{
+        background-color: {card_bg};
+        border: 2px solid {border_color};
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
     }}
 
     /* Focus indicators for keyboard navigation */
@@ -384,38 +378,31 @@ def apply_custom_css():
         min-height: 50px !important;
     }}
 
-    /* Accessibility announcements */
-    .sr-only {{
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0,0,0,0);
-        white-space: nowrap;
-        border: 0;
+    /* Audio visualization */
+    .recording-indicator {{
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background-color: #ff4444;
+        border-radius: 50%;
+        animation: pulse 1.5s infinite;
+        margin-left: 10px;
     }}
-    
-    /* Live conversation styling */
-    .conversation-bubble {{
-        padding: 15px;
-        border-radius: 18px;
-        margin: 10px 0;
-        max-width: 80%;
-    }}
-    
-    .user-bubble {{
-        background-color: #d1e7ff;
-        margin-left: auto;
-    }}
-    
-    .bot-bubble {{
-        background-color: #f0f0f0;
-        margin-right: auto;
+
+    @keyframes pulse {{
+        0% {{
+            box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
+        }}
+        70% {{
+            box-shadow: 0 0 0 10px rgba(255, 68, 68, 0);
+        }}
+        100% {{
+            box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
+        }}
     }}
     </style>
     """, unsafe_allow_html=True)
+
 
 def text_to_speech(text: str, language_code: str) -> Optional[bytes]:
     """Convert text to speech using gTTS"""
@@ -433,11 +420,35 @@ def text_to_speech(text: str, language_code: str) -> Optional[bytes]:
         return None
 
 
+def speech_to_text(audio_bytes: bytes, language_code: str) -> Optional[str]:
+    """Convert speech to text using speech recognition"""
+    if not AUDIO_ENABLED:
+        return None
+
+    try:
+        recognizer = sr.Recognizer()
+
+        # Create AudioData from bytes
+        audio_data = sr.AudioData(audio_bytes, 44100, 2)
+
+        with sr.Microphone() as src:
+            recognizer.adjust_for_ambient_noise(src, duration=2)  # autocalibrate
+            audio = recognizer.listen(src, timeout=5, phrase_time_limit=10)
+
+            # Recognize speech
+            try:
+                print(audio)
+                text = recognizer.recognize_google(audio, language=language_code)
+                return text
+            except sr.UnknownValueError:
+                return "Could not understand the audio"
+            except sr.RequestError as e:
+                return f"Speech recognition error: {str(e)}"
+    except Exception as e:
+        st.error(f"Speech-to-text error: {e}")
+        return None
 
 
-##########################
-# tab1 LESSON CARDS
-##########################
 def display_lesson_card(lesson_key: str, lesson_data: Dict):
     """Display a lesson card with accessibility features"""
     completed = lesson_key in st.session_state.lesson_completed
@@ -446,11 +457,9 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
     container = st.container()
     with container:
         # Use columns for better layout
-        # col1_width : col2_width is 3:1
         col1, col2 = st.columns([3, 1])
 
         with col1:
-            # SHOW THE LESSON FROM THE CURRICULUM
             st.markdown(f"""
             <div class="lesson-card" role="article" aria-label="{lesson_data['title']} lesson">
                 <h3>{lesson_data['title']} {"✅" if completed else ""}</h3>
@@ -461,12 +470,10 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
             """, unsafe_allow_html=True)
 
         with col2:
-            # INITIALLY - Show "Start <lesson title>" buttons
             # Button outside of markdown for proper functionality
             if st.button(
                     f"Start {lesson_data['title']}" if not completed else f"Review {lesson_data['title']}",
                     key=f"start_{lesson_key}",
-                    # tooltip when you hover over the button
                     help=f"Begin the {lesson_data['title']} lesson",
                     use_container_width=True
             ):
@@ -476,30 +483,7 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
             if completed:
                 st.success("✅ Completed", icon="✅")
 
-##########################
 
-
-def display_progress_bar():
-    """Display overall progress"""
-    total_lessons = len(CURRICULUM)
-    completed_lessons = len(st.session_state.lesson_completed)
-    progress = (completed_lessons / total_lessons) * 100
-
-    st.markdown(f"""
-    <div class="progress-bar" role="progressbar" aria-valuenow="{progress}" 
-         aria-valuemin="0" aria-valuemax="100">
-        <div class="progress-fill" style="width: {progress}%">
-            {int(progress)}% Complete
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-
-##########################
-# from tab1 - after selecting a PRACTICE
-# the "supposed tab2"
-##########################
 def practice_interface(teacher: GeminiLanguageTeacher):
     """Main practice interface"""
     current_lesson = CURRICULUM.get(st.session_state.current_topic, CURRICULUM['greetings'])
@@ -512,30 +496,23 @@ def practice_interface(teacher: GeminiLanguageTeacher):
     st.header(f"📚 {current_lesson['title']}")
     st.markdown(f"*{current_lesson['description']}*")
 
-    ###############################
     # Phrase selector
-    ###############################
     selected_phrase = st.selectbox(
         "Choose a phrase to practice:",
         current_lesson['phrases'],
         help="Select a phrase to learn its translation and practice pronunciation"
     )
-    ###############################
-
 
     if selected_phrase:
         # Get translation
         target_lang = st.session_state.target_language
         translation_data = teacher.get_translation(selected_phrase, target_lang)
-        
 
-        ###############################
         # Display translation card
-        ###############################
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("### 🇬🇧 English")
+            st.markdown("### English")
             st.markdown(f"**{selected_phrase}**")
 
         with col2:
@@ -543,32 +520,20 @@ def practice_interface(teacher: GeminiLanguageTeacher):
             st.markdown(f"**{translation_data['translation']}**")
             if translation_data['pronunciation']:
                 st.markdown(f"*Pronunciation: {translation_data['pronunciation']}*")
-        ###############################
 
-
-        ###############################
         # Usage notes
-        ###############################
         if translation_data.get('usage_notes'):
             st.info(f"💡 {translation_data['usage_notes']}")
-        ###############################
 
-
-        ###############################
-        # play translation or record audio
-        ###############################
+        # Audio controls with recording
         st.markdown("### 🔊 Listen and Practice")
 
-        # check if TTS and audio imports worked
         if not AUDIO_ENABLED:
-            st.info(
-                "🔇 Audio features are not available. To enable audio, install the optional audio libraries listed in requirements.txt")
+            st.info("🔇 Audio features are not available. To enable audio, install the optional audio libraries.")
 
+        # Three main audio actions
+        col1, col2, col3 = st.columns(3)
 
-        # col1, col2, col3 = st.columns(3)
-        col1, col2 = st.columns(2)
-
-        # Audio controls
         with col1:
             if st.button("🔊 Play Translation", key="play_translation",
                          help="Listen to the pronunciation"):
@@ -580,19 +545,84 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                     if audio_data:
                         st.audio(audio_data, format='audio/mp3')
                 else:
-                    st.info("🔇 Audio features are not available. Install audio libraries to enable.")
+                    st.info("🔇 Audio features are not available.")
 
-
-        # currently not working
         with col2:
-            if st.button("🎤 Record Your Voice", key="record_voice",
-                         help="Record yourself saying the phrase"):
-                st.info("🎤 Recording feature coming soon!")
-                # Note: Actual recording would require WebRTC implementation
+            if AUDIO_ENABLED and RECORDER_AVAILABLE:
+                st.markdown("🎤 **Record Your Voice**")
 
+                # Use audio_recorder for simple recording
+                audio_bytes = audio_recorder(
+                    text="Click to record",
+                    recording_color="#e8b62c",
+                    neutral_color="#6aa36f",
+                    icon_name="microphone",
+                    icon_size="2x",
+                    key=f"recorder_{selected_phrase}"
+                )
 
-        # currently not updating the 'selected_phrase' st.selectbox
-        # maybe comment out this line?
+                if audio_bytes:
+                    st.audio(audio_bytes, format="audio/wav")
+
+                    # Analyze the recording
+                    with st.spinner("Analyzing your pronunciation..."):
+                        # Transcribe
+                        transcribed = speech_to_text(audio_bytes, LANGUAGES[target_lang])
+
+                        if transcribed:
+                            st.markdown(f"**You said:** {transcribed}")
+
+                            # Get evaluation
+                            evaluation = teacher.evaluate_pronunciation(
+                                transcribed,
+                                translation_data['translation'],
+                                target_lang
+                            )
+
+                            # Display score
+                            score = evaluation.get('accuracy_score', 0)
+                            if score >= 80:
+                                st.success(f"🎯 Excellent! Score: {score}/100")
+                            elif score >= 60:
+                                st.warning(f"👍 Good effort! Score: {score}/100")
+                            else:
+                                st.info(f"💪 Keep practicing! Score: {score}/100")
+
+                            # Feedback
+                            st.markdown(f"**Feedback:** {evaluation.get('feedback', '')}")
+
+                            # Tips
+                            if evaluation.get('tips'):
+                                with st.expander("💡 Tips for improvement"):
+                                    for tip in evaluation['tips']:
+                                        st.markdown(f"• {tip}")
+
+                            # Encouragement
+                            st.info(f"💬 {evaluation.get('encouragement', 'Keep practicing!')}")
+            else:
+                # Fallback for when recorder is not available
+                st.markdown("🎤 **Recording**")
+
+                # Alternative: File upload for audio
+                uploaded_audio = st.file_uploader(
+                    "Upload an audio recording",
+                    type=['wav', 'mp3', 'm4a'],
+                    key=f"upload_{selected_phrase}",
+                    help="Record yourself saying the phrase and upload the audio file"
+                )
+
+                if uploaded_audio:
+                    audio_bytes = uploaded_audio.read()
+                    st.audio(audio_bytes)
+
+                    if AUDIO_ENABLED:
+                        with st.spinner("Analyzing..."):
+                            transcribed = speech_to_text(audio_bytes, LANGUAGES[target_lang])
+                            if transcribed:
+                                st.markdown(f"**You said:** {transcribed}")
+                    else:
+                        st.info("Install audio libraries for speech recognition")
+
         # with col3:
         #     if st.button("📝 Next Phrase", key="next_phrase",
         #                  help="Move to the next phrase"):
@@ -601,16 +631,14 @@ def practice_interface(teacher: GeminiLanguageTeacher):
         #         if current_idx < len(current_lesson['phrases']) - 1:
         #             next_phrase = current_lesson['phrases'][current_idx + 1]
         #             st.success(f"Moving to: {next_phrase}")
+        #             st.rerun()
         #         else:
         #             st.session_state.lesson_completed.add(st.session_state.current_topic)
         #             st.balloons()
         #             st.success("🎉 Lesson completed!")
-        ###############################
-
-
 
         # Interactive practice
-        st.markdown("### 💬 Practice Typing Translated Text")
+        st.markdown("### 💬 Practice Conversation")
 
         user_input = st.text_input(
             "Try translating this phrase yourself:",
@@ -619,18 +647,8 @@ def practice_interface(teacher: GeminiLanguageTeacher):
         )
 
         if user_input:
-            # Approach 1 - Exact string matching
-            # # Simple feedback (in real app, would use Gemini for evaluation)
-            # if user_input.lower() == translation_data['translation'].lower():
-            #     st.success("🎯 Perfect! Great job!")
-            # else:
-            #     st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
-            #     st.info("Keep practicing! You're doing great!")
-            # Calculate similarity score (0-100)
-            
-            # Approach 2 - flexible/fuzzy match
             similarity = fuzz.ratio(user_input.lower(), translation_data['translation'].lower())
-            
+
             if similarity > 90:  # Adjust threshold as needed
                 st.success("🎯 Perfect! Great job!")
             elif similarity > 70:
@@ -641,33 +659,22 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 st.info("Keep practicing! You'll get it next time!")
 
 
-
-
-##########################
-
-
-
-
-
-
 def main():
     """Main application"""
     init_session_state()
     apply_custom_css()
 
-    # Skip to main content link for screen readers
-    st.markdown('<a href="#main-content" class="skip-link">Skip to main content</a>',
-                unsafe_allow_html=True)
+    # # Skip to main content link for screen readers
+    # st.markdown('<a href="#main-content" class="skip-link">Skip to main content</a>',
+    #             unsafe_allow_html=True)
 
     # Header
     col1, col2, col3 = st.columns([2, 1, 1])
 
-    # TOP-LEFT
     with col1:
         st.title("🌍 Language Learner")
         st.markdown("Learn a new language with AI-powered assistance!")
 
-    # TOP-MIDDLE
     with col2:
         # Language selector
         st.session_state.target_language = st.selectbox(
@@ -677,7 +684,6 @@ def main():
             help="Choose the language you want to learn"
         )
 
-    # TOP-RIGHT
     with col3:
         # Accessibility controls
         with st.expander("♿ Accessibility"):
@@ -699,16 +705,11 @@ def main():
                         on_change=lambda: setattr(st.session_state, 'high_contrast',
                                                   not st.session_state.high_contrast))
 
-    
-    # TOP-MIDDLE OF THE PAGE
-    # Progress overview
-    display_progress_bar()
+    # # Progress overview
+    # display_progress_bar()
 
-
-    # PLACEHOLDER CONTAINER FOR SCREEN READER TO JUMP HERE
     # Main content area
     st.markdown('<div id="main-content"></div>', unsafe_allow_html=True)
-
 
     # Initialize teacher
     api_key = os.getenv('GEMINI_API_KEY', '')
@@ -719,43 +720,20 @@ def main():
     if api_key:
         teacher = GeminiLanguageTeacher(api_key)
 
-        # Check if we're in PRACTICE MODE
-        # AFTER SELECTING A TAB
-        # AFTER WE SELECT A PRACTICE IN 'tab1 📚 Lessons'
+        # Check if we're in practice mode
         if st.session_state.current_topic and st.session_state.current_topic in CURRICULUM:
             # Show practice interface
             practice_interface(teacher)
         else:
-            # Show MAIN NAVIGATION TABS
-            # WHEN THE PAGE LOADS INITIALLY
-            # tab1, tab2, tab3, tab4 = st.tabs(["📚 Lessons", "🗣️ Practice", "🎤 Live Conversation", "📊 Progress"])
-            
-            # with tab1:
-            with st.container():
-
-                st.header("Choose Your Lesson")
-
-                # Display LESSON CARDS in a grid
-                cols = st.columns(2)
-                for idx, (lesson_key, lesson_data) in enumerate(CURRICULUM.items()):
-                    # in col0 OR col1
-                    with cols[idx % 2]:
-                        display_lesson_card(lesson_key, lesson_data)
-            
-
-
+            # Display lesson cards in a grid
+            cols = st.columns(2)
+            for idx, (lesson_key, lesson_data) in enumerate(CURRICULUM.items()):
+                with cols[idx % 2]:
+                    display_lesson_card(lesson_key, lesson_data)
 
     # Footer
     st.markdown("---")
-    st.markdown(
-        """
-        <div style='text-align: center'>
-            <p>Made with ❤️ for language learners everywhere</p>
-            <p>Press Tab to navigate • Press Space to select • Press Escape to close menus</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+
 
 
 if __name__ == "__main__":
