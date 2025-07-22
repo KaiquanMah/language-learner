@@ -636,7 +636,11 @@ def practice_interface(teacher: GeminiLanguageTeacher):
 
 
 
-        # currently not working
+        # currently still debugging
+        # audio recording works
+        # audio file playback appears
+        # BUT error appears later
+        #     "Speech-to-text error: No Default Input Device Available"
         with col2:
             if AUDIO_ENABLED and RECORDER_AVAILABLE:
                 st.markdown("🎤 **Record Your Voice**")
