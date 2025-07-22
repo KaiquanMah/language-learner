@@ -175,6 +175,15 @@ language-learner/
 
 
 
+
+## Limitations
+* Unable to record ourselves and check for pronunciation
+  * This could have helped users learn to pronounce words better
+* Unable to track progress using a progress bar and dashboard
+  * This would have allowed for gamification of the app
+
+
+
 ## Configuration
 
 ### Environment Variables
