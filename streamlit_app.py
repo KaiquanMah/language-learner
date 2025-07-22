@@ -495,6 +495,13 @@ def speech_to_text(audio_bytes: bytes, language_code: str) -> Optional[str]:
         return None
 
 
+
+
+
+
+##########################
+# tab1 LESSON CARDS
+##########################
 def display_lesson_card(lesson_key: str, lesson_data: Dict):
     """Display a lesson card with accessibility features"""
     completed = lesson_key in st.session_state.lesson_completed
@@ -502,10 +509,13 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
     # Create a unique container for each lesson
     container = st.container()
     with container:
+
         # Use columns for better layout
+        # col1_width : col2_width is 3:1
         col1, col2 = st.columns([3, 1])
 
         with col1:
+            # SHOW THE LESSON FROM THE CURRICULUM
             st.markdown(f"""
             <div class="lesson-card" role="article" aria-label="{lesson_data['title']} lesson">
                 <h3>{lesson_data['title']} {"✅" if completed else ""}</h3>
@@ -516,10 +526,12 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
             """, unsafe_allow_html=True)
 
         with col2:
+            # INITIALLY - Show "Start <lesson title>" buttons
             # Button outside of markdown for proper functionality
             if st.button(
                     f"Start {lesson_data['title']}" if not completed else f"Review {lesson_data['title']}",
                     key=f"start_{lesson_key}",
+                    # tooltip when you hover over the button
                     help=f"Begin the {lesson_data['title']} lesson",
                     use_container_width=True
             ):
@@ -529,7 +541,12 @@ def display_lesson_card(lesson_key: str, lesson_data: Dict):
             if completed:
                 st.success("✅ Completed", icon="✅")
 
+##########################
 
+
+##########################
+# from tab1 - after selecting a PRACTICE
+##########################
 def practice_interface(teacher: GeminiLanguageTeacher):
     """Main practice interface"""
     current_lesson = CURRICULUM.get(st.session_state.current_topic, CURRICULUM['greetings'])
@@ -542,19 +559,27 @@ def practice_interface(teacher: GeminiLanguageTeacher):
     st.header(f"📚 {current_lesson['title']}")
     st.markdown(f"*{current_lesson['description']}*")
 
+
+    ###############################
     # Phrase selector
+    ###############################
     selected_phrase = st.selectbox(
         "Choose a phrase to practice:",
         current_lesson['phrases'],
         help="Select a phrase to learn its translation and practice pronunciation"
     )
+    ###############################
+
 
     if selected_phrase:
         # Get translation
         target_lang = st.session_state.target_language
         translation_data = teacher.get_translation(selected_phrase, target_lang)
 
+
+        ###############################
         # Display translation card
+        ###############################
         col1, col2 = st.columns(2)
 
         with col1:
@@ -566,20 +591,36 @@ def practice_interface(teacher: GeminiLanguageTeacher):
             st.markdown(f"**{translation_data['translation']}**")
             if translation_data['pronunciation']:
                 st.markdown(f"*Pronunciation: {translation_data['pronunciation']}*")
+        ###############################
 
+
+
+
+        ###############################
         # Usage notes
+        ###############################        
         if translation_data.get('usage_notes'):
             st.info(f"💡 {translation_data['usage_notes']}")
+        ###############################
 
-        # Audio controls with recording
+
+
+
+        ###############################
+        # play translation or record audio
+        ###############################
         st.markdown("### 🔊 Listen and Practice")
-
+        
+        # check if TTS and audio imports worked
         if not AUDIO_ENABLED:
             st.info("🔇 Audio features are not available. To enable audio, install the optional audio libraries.")
 
         # Three main audio actions
-        col1, col2, col3 = st.columns(3)
+        # col1, col2, col3 = st.columns(3)
+        # 2 main audio actions
+        col1, col2 = st.columns(2)
 
+        # Audio controls
         with col1:
             if st.button("🔊 Play Translation", key="play_translation",
                          help="Listen to the pronunciation"):
@@ -593,6 +634,9 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 else:
                     st.info("🔇 Audio features are not available.")
 
+
+
+        # currently not working
         with col2:
             if AUDIO_ENABLED and RECORDER_AVAILABLE:
                 st.markdown("🎤 **Record Your Voice**")
@@ -704,6 +748,12 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                 st.warning(f"Not quite. The correct translation is: {translation_data['translation']}")
                 st.info("Keep practicing! You'll get it next time!")
 
+##########################
+
+
+
+
+
 
 def main():
     """Main application"""
@@ -717,10 +767,12 @@ def main():
     # Header
     col1, col2, col3 = st.columns([2, 1, 1])
 
+    # TOP-LEFT
     with col1:
         st.title("🌍 Language Learner")
         st.markdown("Learn a new language with AI-powered assistance!")
 
+    # TOP-MIDDLE
     with col2:
         # Language selector
         st.session_state.target_language = st.selectbox(
@@ -730,6 +782,7 @@ def main():
             help="Choose the language you want to learn"
         )
 
+    # TOP-RIGHT
     with col3:
         # Accessibility controls
         with st.expander("♿ Accessibility"):
@@ -751,9 +804,11 @@ def main():
                         on_change=lambda: setattr(st.session_state, 'high_contrast',
                                                   not st.session_state.high_contrast))
 
+    # TOP-MIDDLE OF THE PAGE
     # # Progress overview
     # display_progress_bar()
 
+    # PLACEHOLDER CONTAINER FOR SCREEN READER TO JUMP HERE
     # Main content area
     st.markdown('<div id="main-content"></div>', unsafe_allow_html=True)
 
@@ -766,7 +821,8 @@ def main():
     if api_key:
         teacher = GeminiLanguageTeacher(api_key)
 
-        # Check if we're in practice mode
+        # Check if we're in PRACTICE MODE
+        # AFTER SELECTING A TAB
         if st.session_state.current_topic and st.session_state.current_topic in CURRICULUM:
             # Show practice interface
             practice_interface(teacher)
