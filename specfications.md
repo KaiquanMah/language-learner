@@ -49,13 +49,13 @@ Repeat the Cycle / Move on to the Next Lesson
 ### Main Lesson Selection
 - Choose from beginner and intermediate lessons
 - See phrase counts for each lesson
-![Landing Page](artifacts\2025.07.22-streamlit-landing-page.png)
+![Landing Page](artifacts/2025.07.22-streamlit-landing-page.png)
 
 ### Practice Interface
 - Real-time translations
 - Pronunciation guides
 - Interactive practice with feedback
-![Practice Page](artifacts\2025.07.22-streamlit-practice.png)
+![Practice Page](artifacts/2025.07.22-streamlit-practice.png)
 
 
 
