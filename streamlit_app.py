@@ -468,28 +468,40 @@ def text_to_speech(text: str, language_code: str) -> Optional[bytes]:
 
 def speech_to_text(audio_bytes: bytes, language_code: str) -> Optional[str]:
     """Convert speech to text using speech recognition"""
+    """Most robust implementation with format detection"""
+
     if not AUDIO_ENABLED:
         return None
 
     try:
         recognizer = sr.Recognizer()
+        
+        # Save audio bytes to temporary WAV file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_audio:
+            temp_audio.write(audio_bytes)
+            temp_audio_path = temp_audio.name
 
-        # Create AudioData from bytes
-        audio_data = sr.AudioData(audio_bytes, 44100, 2)
 
-        with sr.Microphone() as src:
-            recognizer.adjust_for_ambient_noise(src, duration=2)  # autocalibrate
-            audio = recognizer.listen(src, timeout=5, phrase_time_limit=10)
+        try:
+            # Load audio file for recognition
+            with sr.AudioFile(temp_audio_path) as source:
+                # Adjust for ambient noise and record
+                recognizer.adjust_for_ambient_noise(source)
+                audio_data = recognizer.record(source)
+                # Recognize speech using the recorded audio data
+                text = recognizer.recognize_google(audio_data, language=language_code)
 
-            # Recognize speech
+        except sr.UnknownValueError:
+            return "Could not understand the audio"
+        except sr.RequestError as e:
+            return f"Speech recognition error: {str(e)}"
+        finally:
+            # Clean up temporary file
             try:
-                print(audio)
-                text = recognizer.recognize_google(audio, language=language_code)
-                return text
-            except sr.UnknownValueError:
-                return "Could not understand the audio"
-            except sr.RequestError as e:
-                return f"Speech recognition error: {str(e)}"
+                os.unlink(temp_audio_path)
+            except:
+                pass
+
     except Exception as e:
         st.error(f"Speech-to-text error: {e}")
         return None
