@@ -514,6 +514,7 @@ def speech_to_text(audio_bytes: bytes, language_code: str) -> Optional[str]:
                 audio_data = recognizer.record(source)
                 # Recognize speech using the recorded audio data
                 text = recognizer.recognize_google(audio_data, language=language_code)
+                return text
 
         except sr.UnknownValueError:
             return "Could not understand the audio"
