@@ -161,6 +161,7 @@ CURRICULUM = {
 }
 
 # Language options with full names and codes
+# used for google text to speech gTTS
 LANGUAGES = {
     'Hebrew': 'iw', # 2025.07.17 fix language code
     'Finnish': 'fi',
@@ -176,6 +177,29 @@ LANGUAGES = {
     'Bahasa Melayu': 'ms',
     'Chinese (Mandarin)': 'zh'
 }
+
+# 2025.07.24
+# https://github.com/Uberi/speech_recognition/blob/master/speech_recognition/__init__.py
+# https://github.com/Uberi/speech_recognition/blob/master/speech_recognition/recognizers/google.py#L225
+# speech to text requires another set of language tags
+# specifically RFC5646 language tags
+# for the full list, refer to https://stackoverflow.com/questions/14257598/what-are-language-codes-in-chromes-implementation-of-the-html5-speech-recogniti/14302134#14302134
+LANGUAGES_stt = {
+    'Hebrew': 'he-IL',
+    'Finnish': 'fi',
+    'French': 'fr-FR',
+    'German': 'de-DE',
+    'Spanish': 'es-ES',
+    'Italian': 'it-IT',
+    'Portuguese': 'pt-PT',
+    'Japanese': 'ja',
+    'Korean': 'ko',
+    'Hindi': 'hi-IN',
+    'Arabic': 'ar',
+    'Bahasa Melayu': 'ms-MY',
+    'Chinese (Mandarin)': 'zh-cn'
+}
+
 
 
 class GeminiLanguageTeacher:
@@ -675,7 +699,7 @@ def practice_interface(teacher: GeminiLanguageTeacher):
                     # Analyze the recording
                     with st.spinner("Analyzing your pronunciation..."):
                         # Transcribe
-                        transcribed = speech_to_text(audio_bytes, LANGUAGES[target_lang])
+                        transcribed = speech_to_text(audio_bytes, LANGUAGES_stt[target_lang])
 
                         if transcribed:
                             st.markdown(f"**You said:** {transcribed}")
@@ -725,7 +749,7 @@ def practice_interface(teacher: GeminiLanguageTeacher):
 
                     if AUDIO_ENABLED:
                         with st.spinner("Analyzing..."):
-                            transcribed = speech_to_text(audio_bytes, LANGUAGES[target_lang])
+                            transcribed = speech_to_text(audio_bytes, LANGUAGES_stt[target_lang])
                             if transcribed:
                                 st.markdown(f"**You said:** {transcribed}")
                     else:
