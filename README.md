@@ -3,7 +3,9 @@ This Language Learner web application is created for the last assignment in the 
 
 Students: Yair Reichman, Kaiquan Mah
 
+
 Please read / visit
+* **Video Walkthrough**: https://github.com/KaiquanMah/language-learner/blob/main/artifacts/language-learner-walkthrough-video.mp4
 * **specfications.md** for more details about the design of the Streamlit app
 * **vibe-code-experience.md** for more details about our vibe coding experience
 * **code and dependency files**: streamlit_app.py, packages.txt, requirements.txt
