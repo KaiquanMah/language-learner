@@ -59,6 +59,32 @@ Repeat the Cycle / Move on to the Next Lesson
 
 
 
+## Technical Details
+
+- **Frontend**: Streamlit
+- **Backend**: Python
+- **AI Model**: Google Gemini Pro - `gemma-3-27b-it` #14.4k requests per day
+- **Hosting**: Streamlit Community Cloud
+
+
+
+## Project Structure
+
+```
+language-learner/
+├── archive                      # folder containing archived builds
+├── artifacts                    # folder containing terminal workings, vibe code 'plan.md' and screenshots for the 'vibe-code-experience.md' assignment report
+├── .env                         # API key configuration (create this yourself)
+├── .gitignore                   # Git ignore file
+├── README.md                    # Repo README
+├── specifications.md            # This file containing the specifications
+├── vibe-code-experience.md      # 1-2 page documentation of our experience using vibe coding at times during the assignment
+├── packages.txt                 # System packages for Streamlit Community Cloud
+├── requirements.txt             # Libraries
+├── streamlit_app.py             # Full version with audio features
+```
+
+
 
 ## Quick Start
 
@@ -124,34 +150,14 @@ Repeat the Cycle / Move on to the Next Lesson
 
 
 
-## Project Structure
-
-```
-language-learner/
-├── archive                      # folder containing archived builds
-├── artifacts                    # folder containing terminal workings, vibe code 'plan.md' and screenshots for the 'vibe-code-experience.md' assignment report
-├── .env                         # API key configuration (create this yourself)
-├── .gitignore                   # Git ignore file
-├── README.md                    # Repo README
-├── specifications.md            # This file containing the specifications
-├── vibe-code-experience.md      # 1-2 page documentation of our experience using vibe coding at times during the assignment
-├── packages.txt                 # System packages for Streamlit Community Cloud
-├── requirements.txt             # Libraries
-├── streamlit_app.py             # Full version with audio features
-```
-
-
 
 ## Curriculum Overview
 
-### Beginner Lessons
 1. **Basic Greetings** - Hello, goodbye, introductions
 2. **Numbers 1-20** - Learn to count
 3. **Daily Phrases** - Common everyday expressions
-
-### Intermediate Lessons
-1. **Food & Drink** - Restaurant and cafe vocabulary
-2. **Directions** - Asking for and giving directions
+4. **Food & Drink** - Restaurant and cafe vocabulary
+5. **Directions** - Asking for and giving directions
 
 
 
@@ -189,15 +195,5 @@ language-learner/
 ### Environment Variables
 - `GEMINI_API_KEY`: Your Google Gemini API key (required)
 
-### Customization
-You can customize the app by modifying:
-- `CURRICULUM`: Add or modify lessons
-- `LANGUAGES`: Add more language options
-- `apply_custom_css()`: Adjust styling
-
 **Happy Language Learning! ✨**
-
-
-
-
 
